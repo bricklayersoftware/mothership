@@ -1076,7 +1076,7 @@
             let payload = createBuiltInCmd('SendBroadcast');
             payload.destination = 'BROADCAST';
             sendMessage(payload);
-        }, 30000);
+        }, 5000);
 
         setInterval(() => {
             logmsg('ping ' + getRandomCode(8));
@@ -1219,11 +1219,11 @@
             refreshCommandsTable(result);
         }
 
-        function process_GetTargetHTML(result) {        
+        function process_GetTargetHTML(result, message) {        
             logmsg('GetTargetHTML');        
         }
 
-        function process_RefreshDOM(result) {
+        function process_RefreshDOM(result, message) {
 
             result = atob(result);
 
@@ -1238,7 +1238,7 @@
             refreshTable('domList', result);
         }
 
-        function process_GetFrontendUrls(result) {
+        function process_GetFrontendUrls(result, message) {
 
             if (Array.isArray(result) && result.length > 0) {
                 result = result[0];
@@ -1247,14 +1247,14 @@
             document.getElementById('devtoolsFrontendUrl').value = result.devtoolsFrontendUrl;
         }
 
-        function process_GetTargets(result) {
+        function process_GetTargets(result, message) {
             let targets = result;
             // TODO validate targets before updating
             targetslist = targets;
             refreshTargets(targets);
         }
 
-        function process_ExecEvaluate(result) {
+        function process_ExecEvaluate(result, message) {
 
             result = atob(result);
             try {

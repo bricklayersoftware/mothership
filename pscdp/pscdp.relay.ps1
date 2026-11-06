@@ -16,7 +16,7 @@ $scriptGuid = '70d8ab8e-fdb2-4076-9fd8-ba81c1be92e3' # Use a unique GUID for eac
     #exit 1
 #}
 
-Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Windows.Formsk
 Add-Type -AssemblyName System.Drawing
 
 # 20260925-1432
@@ -173,6 +173,11 @@ function Get-KeyboardLog() {
 
 class PSCDPCommandException : System.Exception {
     PSCDPCommandException([string]$message) : base($message) {}
+}
+
+class PSCDPBuiltInCommand {
+    [string]$source=$null
+    [string]$destination=$null
 }
 
 class PSCDPCommand {
@@ -1014,7 +1019,6 @@ function ChunkBytes {
 
     return $resultout
 }
-
 
 # http GET/POST requests to chrome cdp
 function Process-CDP {

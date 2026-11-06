@@ -1,4 +1,4 @@
-# https://orgfarm-bd12a2161b-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/client_pubnub
+# https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/client_pubnub
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -Path $scriptDir
@@ -25,8 +25,8 @@ function Get-Timestamp {
 
 
 class PubNub {
-    $publishKey = "pub-c-a00eaad9-c35e-4a41-bd62-cdc619a6f2cc"
-    $subscribeKey = "sub-c-94ed1e1c-a765-4fd9-ba9e-f8ebbb47f5bd"
+    $publishKey = "pub-c-bd83b994-1964-4760-9bf2-142ceadf7f66"
+    $subscribeKey = "sub-c-62ba6c3d-b786-4be3-a033-e472ab227774"
     $channel = "clientid_88992233_JS_client"
     $UUID     = "powershell_client_" + (New-Guid).Guid.Substring(0,8)
     $baseUrl  = "ps.pndsn.com"
