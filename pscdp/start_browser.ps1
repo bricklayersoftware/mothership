@@ -93,7 +93,7 @@ function LaunchBrowser {
 
     $targs = ConvertArgs $sargs
 
-    $process = Start-Process -FilePath $path -ArgumentList "$( $targs -join " " )" -PassThru
+    $process = Start-Process -FilePath $exepath -ArgumentList "$( $targs -join " " )" -PassThru
 
     if ( ! $process.HasExited ) {
         Write-Host "The process is currently RUNNING (PID: ($($process.Id))."
@@ -170,7 +170,7 @@ $launch_chrome = {
     }
     #>
 
-    LaunchBrowser $debugport $path $datadir
+    LaunchBrowser $debugport $chromepath $datadir
 }
 
 $launch_msedge = {
