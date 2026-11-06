@@ -223,6 +223,18 @@ $machine_configs.Add(
     }
 )
 
+$machine_configs.Add(
+    @{
+        computername=$null;
+        username="LC2022";
+        launch_pubnub_action=$launch_msedge;
+        pubnub_debug_port=$msedge_port
+        launch_client_action=$launch_chrome
+        client_debug_port=$chrome_port
+        chrome_path="C:\Users\LC2022\AppData\Local\uchrome\ungoogled-chromium-portable.exe"
+    }
+)
+
 $machine_config = $machine_configs | Where-Object {
     ( ( $null -eq $_.username ) -or $_.username -eq $env:USERNAME ) -and ( ( $null -eq $_.computername ) -or ( $_.computername -eq $env:COMPUTERNAME ) )
 } | Select-Object -First 1
