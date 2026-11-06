@@ -2285,7 +2285,7 @@ class PSCDP {
             if ( ( ! $null -eq $this.pubnubTarget.addbinding_ts_ok ) -and ( ! $null -eq $this.pubnubTarget.addbinding_ts ) ) {
                 $e = ( $this.pubnubTarget.addbinding_ts_ok - $this.pubnubTarget.addbinding_ts ).TotalSeconds
             } elseif ( ! $null -eq $this.pubnubTarget.addbinding_ts ) {
-                $e = $this.pubnubTarget.addbinding_ts
+                $e = ( (Get-Date) - $this.pubnubTarget.addbinding_ts ).TotalSeconds
             } else {
                 $e = -1
             }
