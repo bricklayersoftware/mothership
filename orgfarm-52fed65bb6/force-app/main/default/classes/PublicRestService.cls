@@ -1,26 +1,3 @@
-// https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/client_pubnub
-// https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/<endpoint>.php
-// client_pubnub -- GET |      |     |
-
-// https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce.com/
-// sebastianwolf2947.598f03371d7a@agentforce.com
-// As1df1gh!
-
-// cmd /k F:\__Binaries\sfdx\client\bin\sf.cmd org login web --alias storagevault941@agentforce.com
-// C:\Users\LC2022\AppData\Local\sfdx\bin\sf.cmd org auth show-access-token -o storagevault941@agentforce.com
-// cmd /k F:\__Binaries\sfdx\client\bin\sf.cmd deploy metadata -m ApexClass:PublicRestService -o storagevault941@agentforce.com
-// cmd /k F:\__Binaries\sfdx\client\bin\sf.cmd project retrieve start -m ApexClass:PublicRestService -o storagevault941@agentforce.com
-// cmd /k F:\__Binaries\sfdx\client\bin\sf.cmd apex generate class --name FileHelper --output-dir force-app/main/default/classes
-
-// sf org login web --alias storagevault941@agentforce.com
-// sf project deploy start --source-dir force-app/main/default/classes/PublicRestService.cls --target-org mothershiporg
-// sf project retrieve start -m ApexTrigger
-// sf deploy metadata -m ApexTrigger:ClientJobTrigger
-// cmd /k F:\__Binaries\sfdx\bin\sf deploy metadata -m ApexClass:PublicRestService -o storagevault941@agentforce.com
-// sf org list
-
-// curl -v -X POST --data-binary "@customers-100.csv" <tplmothership>/ow/upload.php?filename=customers-100.csv
-// curl -v -T customers-100.csv <tplmothership>/ow/upload.php?filename=cust.csv
 
 @RestResource(urlMapping='/*')
 global without sharing class PublicRestService {

@@ -109,6 +109,11 @@ $launch_chrome = {
 
     $datadir = "C:\Users\$($env:USERNAME)\AppData\Local\chrome-test"
 
+    if ( [string]::IsNullOrWhiteSpace($chromepath) ) {
+        $chromepath = $script:chrome_path
+    }
+
+    <#
     if ( ($env:COMPUTERNAME -eq "BWPCP511") -or ( $env:USERNAME -eq "CAT2022" ) ) {
         $path = "C:\Users\$env:USERNAME\AppData\Local\uchrome\ungoogled-chromium-portable.exe"
 
@@ -163,7 +168,7 @@ $launch_chrome = {
     if ( ! $foundpath ) {
             throw "$path does not exist"
     }
-
+    #>
 
     LaunchBrowser $debugport $path $datadir
 }
@@ -205,6 +210,36 @@ $launch_vivaldi = {
 $msedge_port ="9222"
 $chrome_port = "9223"
 
+$machine_configs = [System.Collections.Generic.List[hashtable]]::new()
+$machine_configs.Add(
+    @{
+        computername=$null;
+        username="General";
+        launch_pubnub_action=$launch_msedge;
+        pubnub_debug_port=$msedge_port
+        launch_client_action=$launch_chrome
+        client_debug_port=$chrome_port
+        chrome_path="C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+    }
+)
+
+$machine_config = $machine_configs | Where-Object {
+    ( ( $null -eq $_.username ) -or $_.username -eq $env:USERNAME ) -and ( ( $null -eq $_.computername ) -or ( $_.computername -eq $env:COMPUTERNAME ) )
+} | Select-Object -First 1
+
+$script:chrome_path = $machine_config['chrome_path']
+
+$action = $machine_config['launch_pubnub_action']
+$port = $machine_config['pubnub_debug_port']
+
+& $action $port
+
+$action = $machine_config['launch_client_action']
+$port = $machine_config['client_debug_port']
+
+& $action $port
+
+exit
 
 if ( $env:COMPUTERNAME -eq "BWPCP506" ) {
     & $launch_vivaldi $msedge_port
