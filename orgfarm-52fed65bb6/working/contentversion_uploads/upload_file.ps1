@@ -6,7 +6,7 @@ Write-Information $cwd
 Set-Location -LiteralPath $cwd
 
 $fpath = "client_pubnub.html"
-$uri = "https://orgfarm-bd12a2161b-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/upload.php?filename=$fpath"
+$uri = "https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/upload.php?filename=$fpath"
 
 $fpath = Join-Path $cwd $fpath
 if ( ! ( Test-Path -Path $fpath ) ) {

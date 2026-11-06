@@ -1,4 +1,3 @@
-
 @RestResource(urlMapping='/*')
 global without sharing class PublicRestService {
 
@@ -33,8 +32,9 @@ global without sharing class PublicRestService {
         
         String endpoint = '';
         
-        if ( ! pathSegments.isEmpty() && pathSegments.size() >= 4 ) {
-            endpoint = pathSegments.get(3);
+        if ( ! pathSegments.isEmpty() && pathSegments.size() >= 1 ) {
+            Integer i = pathSegments.size() - 1; 
+            endpoint = pathSegments.get(i);
         }
 
         return endpoint;
@@ -117,7 +117,7 @@ global without sharing class PublicRestService {
         return null;
     }
 
-    // client_pubnub.html
+    // admin.html, client_pubnub.html
     public static void serve_ui(RestRequest req, RestResponse res, string htmlfname) {
         ContentVersion cv = FileHelper.GetContentVersion(htmlfname); //'admin.html');
 
@@ -327,6 +327,7 @@ global without sharing class PublicRestService {
 	// X-Custom-Header: YourCustomValue
     @HttpGet
     global static void processGetRequest() {
+        string Logger_methodname = 'processGetRequest';
         RestResponse res = RestContext.response;
         RestRequest req = RestContext.request;
 		String htmlString = '';
@@ -339,7 +340,7 @@ global without sharing class PublicRestService {
             endpoint = getEndpoint(req);
             subpoint = getSubpoint(req);
 
-            Logger.LogSys('relativeUrl='+relativeUrl+'|endpoint='+endpoint+'|subpoint='+subpoint, 'processGetRequest');
+            Logger.LogSys('relativeUrl='+relativeUrl+'|endpoint='+endpoint+'|subpoint='+subpoint, Logger_methodname);
                        
             if ( String.isBlank(endpoint) ) {
                 endpoint = subpoint;
