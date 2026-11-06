@@ -1098,7 +1098,11 @@ function Send-ChunkedResult {
 }
 
 function Process-BuiltInCommand {
-    param([hashtable]$cmd)
+    param([hashtable]$cmd, [PSCDP]$cdpobj)
+
+    if( $null -ne $cmd ) {
+        $cdpobj.builtincmds.Add($cmd)
+    }
 
     $resultout = @{
         builtincmd=$cmd.builtincmd
@@ -1284,7 +1288,7 @@ function Process-BuiltInCommand {
 # NOTE only supports pb messages with builtincmd payload
 function Process-PubNubEvent {
 
-    param([string]$Message)
+    param([string]$Message,[PSCDP]$cdpobj)
 
     try {
         $payload = $Message | ConvertFrom-Json # should have cmdid, etc.
@@ -1315,7 +1319,7 @@ function Process-PubNubEvent {
 
     if ( $null -ne $cmd ) {
         $cmd = Transform-PSCustomObject($cmd)
-        Process-BuiltInCommand($cmd)
+        Process-BuiltInCommand $cmd $cdpobj
     }
 
 }
@@ -1370,6 +1374,8 @@ class PSCDP {
 
     $commands = [System.Collections.Generic.List[PSCDPCommand]]::new()
     $callbackcmds = [System.Collections.Generic.List[PSCDPCommand]]::new()
+
+    $builtincmds = [System.Collections.Generic.List[hashtable]]::new()
 
     $responses = [System.Collections.Generic.List[hashtable]]::new() 
     $results = [System.Collections.Generic.List[PSCDPResult]]::new() 
@@ -1878,7 +1884,7 @@ class PSCDP {
             if ( $msght['params'].name -eq "onPubNubEvent" ) {
                 $this.pubnubmsgs.Add($msght)
                 $payload = $msght['params'].payload
-                Process-PubNubEvent -Message $payload
+                Process-PubNubEvent -Message $payload -cdpobj $this
             } 
         }
 
@@ -2266,6 +2272,8 @@ class PSCDP {
         }
 
         if ( $null -ne $this.pubnubTarget) {
+            $msgstrs += "[builtincmds: $($this.builtincmds.Count)]"
+
             $msgstrs += "[console logs: $($this.pubnubTarget.consolecalls.Count)]"
 
             $msgstrs += "[broadcasts sent: $($this.broadcasts.Count) received: $($this.broadcastresponses.Count) errors: $($this.broadcasterrors.Count)]"
