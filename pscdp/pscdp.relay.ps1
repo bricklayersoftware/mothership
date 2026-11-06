@@ -2354,7 +2354,7 @@ class PSCDP {
 $script:msedge_debugport = 9222
 $script:chrome_debugport = 9223
 
-$script:pubnuburl = "https://orgfarm-bd12a2161b-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/client_pubnub"
+$script:pubnuburl = "https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/client_pubnub"
 $clientport = $script:chrome_debugport
 $pubnubport = $script:msedge_debugport
 

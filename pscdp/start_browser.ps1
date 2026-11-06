@@ -1,10 +1,4 @@
-# & $path --remote-debugging-port=9222 --profile-directory=Default --remote-allow-origins=* --suppress-message-center-popups  --noerrdialogs --disable-infobars --disable-notifications --no-first-run --no-default-browser-check --disable-signin-promo --hide-crash-restore-bubble --new-window https://orgfarm-bd12a2161b-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/client_pubnub --remote-debugging-address=0.0.0.0 --remote-allow-origins=* --user-data-dir=$datadir
-# & $( Join-Path $path "chrome.exe" ) --remote-debugging-port=9223 --profile-directory=Default --remote-allow-origins=* --suppress-message-center-popups  --noerrdialogs --disable-infobars --disable-notifications --no-first-run --no-default-browser-check --disable-signin-promo --hide-crash-restore-bubble --new-window https://orgfarm-bd12a2161b-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/client_pubnub --remote-debugging-address=0.0.0.0 --remote-allow-origins=* --user-data-dir=$datadir
-# taskkill /F /IM chrome.exe
-#taskkill /F /IM msedge.exe
-# C:\Program Files (x86)\Google\Chrome\Application\chrome.exe
-# C:\Users\LC2022\AppData\Local\uchrome\ungoogled-chromium_154.0.8037.97-1.1_windows_x64
-#$path = "C:\MAIN\__Binaries\ungoogled-chromium_154.0.8037.97-1.1_windows_x64\ungoogled-chromium_154.0.8037.97-1.1_windows_x64"
+$mothershipurl = "https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/client_pubnub"
 
 $processes = Get-CimInstance Win32_Process | Select-Object Name, ProcessId, CommandLine, ExecutablePath
 
@@ -86,7 +80,7 @@ function LaunchBrowser {
         "no-default-browser-check"=$null;
         "disable-signin-promo"=$null;
         "hide-crash-restore-bubble"=$null;
-        "new-window"="https://orgfarm-bd12a2161b-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/client_pubnub";
+        "new-window"=$mothershipurl;
         "remote-debugging-address"="0.0.0.0";
         "user-data-dir"=$datadir
     }
