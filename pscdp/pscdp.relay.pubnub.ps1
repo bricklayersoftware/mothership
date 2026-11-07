@@ -1,10 +1,4 @@
-# https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/client_pubnub
-
-$PublishKey = "pub-c-bd83b994-1964-4760-9bf2-142ceadf7f66" # not used when consuming messages
-$SubscribeKey = "sub-c-62ba6c3d-b786-4be3-a033-e472ab227774"
-$Channel = "clientid_88992233_JS_client"
-$UUID     = "powershell_client_" + (New-Guid).Guid.Substring(0,8) # Required uniquely generated ID
-$BaseUrl  = "ps.pndsn.com"
+# https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/client_pubnub
 
 function Transform-PSCustomObject($obj) {
     $ht = @{}
@@ -20,55 +14,117 @@ function Transform-PSCustomObject($obj) {
     return $ht;
 }
 
-function Get-Uri {
-    param([string]$TimeToken)
-
-    if ( [string]::IsNullOrEmpty($TimeToken) ) {
-        $TimeToken = "0"
-    }
-
-    $treceiveUrl = "https://${BaseUrl}/v2/subscribe/${SubscribeKey}/${Channel}/0/0?uuid=${UUID}&tt=${TimeToken}"
-
-    return $treceiveUrl
+function Get-Timestamp {
+    $ret = Get-Date -Format "HH:mm:ss.fff"
+    return $ret
 }
 
-$timetoken = 0
+class PubNub {
+    $PublishKey = "pub-c-bd83b994-1964-4760-9bf2-142ceadf7f66"
+    $SubscribeKey = "sub-c-62ba6c3d-b786-4be3-a033-e472ab227774"
+    $Channel = "clientid_88992233_JS_client"
+    $UUID     = "pscdp.relay.pubnub.ps1"
 
-while ($true) {
-    Write-Host "new iteration..."
+    $baseUrl  = "ps.pndsn.com"
+    
+    $msgindex = 0
+    $timetoken = 0
 
-    $receiveUrl = Get-Uri -TimeToken $timetoken
+    [System.Net.Http.HttpClientHandler]$handler =  $null
+    [System.Net.Http.HttpClient]$client = $null
 
-    Write-Host "pinging $receiveUrl"
+    $isreceive = $false
+    $isnewresult = $false
+    $response = $null
+    $byteArray = $null
+    $requestTask = $null
 
-    $handler = [System.Net.Http.HttpClientHandler]::new()
-    $client  = [System.Net.Http.HttpClient]::new($handler)
+    $pbmessages = [System.Collections.Generic.List[hashtable]]::new()
 
-    # PubNub server hold is max 310s. Set client timeout higher (e.g., 320 seconds)
-    $client.Timeout = [System.TimeSpan]::FromSeconds(320) 
-    $requestTask = $client.GetAsync($receiveUrl)
-
-    while (-not $requestTask.IsCompleted) {
-        Write-Host "." -NoNewline
-        Start-Sleep -Milliseconds 250
+    [void] Init() {
+        $this.handler = [System.Net.Http.HttpClientHandler]::new()
+        $this.client  = [System.Net.Http.HttpClient]::new($this.handler)
+        $this.client.Timeout = [System.TimeSpan]::FromSeconds(320) 
     }
 
-    Write-Host "" # New line
+    [void] Receive() {
 
-    if ($requestTask.IsFaulted) {
-        Write-Error "Request encountered an unhandled exception: $($requestTask.Exception.InnerException.Message)"
-        $client.Dispose()
-        exit
+        if ( $this.isreceive ) {
+            return
+        }
+
+        $receiveUrl = $this.GetSubscribeUri()
+        $this.requestTask = $this.client.GetAsync($receiveUrl)
+        $this.isreceive = $true
+    }    
+
+    [string] GetSubscribeUri() {
+        if ( [string]::IsNullOrEmpty($this.TimeToken) ) {
+            $this.TimeToken = "0"
+        }
+
+        $treceiveUrl = "https://$($this.BaseUrl)/v2/subscribe/$($this.SubscribeKey)/$($this.Channel)/0/0?uuid=$($this.UUID)&tt=$($this.TimeToken)"
+
+        return $treceiveUrl
     }
 
-    # 4. Extract the HttpResponseMessage Result
-    $response = $requestTask.Result
+    [string] GetPublishUri() {
+        $uri = "https://$($this.BaseUrl)/publish/$($this.PublishKey)/$($this.SubscribeKey)/0/$($this.Channel)/0"
+        return $uri
+    }
 
-    if ($response.IsSuccessStatusCode) {
-        Write-Host "Response received! Status: $($response.StatusCode). Reading stream into byte array..." -ForegroundColor Green
+    [string] PublishMessage([hashtable]$payload) {
+
+        if ( ! $null -eq $payload -and $payload -is [hashtable] ) {
+            $this.msgindex++
+            $payload.Add('timestamp', ( Get-Timestamp ) )
+            $payload.Add('msgindex',$this.msgindex)
+
+        } else {
+            throw "payload must be a valid hashtable"
+        }
+
+        $payloadjson = $payload | ConvertTo-Json -Compress
+            
+        $uri = $this.GetPublishUri()
+    
+        $this.response = Invoke-RestMethod -Uri $uri -Method Post -Body $payloadjson -ContentType "application/json; charset=UTF-8"
+
+        if ( $null -ne $this.response -and $this.response.GetType().Name -eq "Object[]" -and $this.response.length -ge 2 ) {
+            return $this.response[2]
+        }
+
+        return $null
+    }
+    
+
+    [void] ReadResult() {
+        if ( ! $this.isreceive ) {
+            return
+        }
+
+        if ( ! $this.requestTask.IsCompleted ) {
+            return
+        }
+
+        $this.isreceive = $false
+
+        if ($this.requestTask.IsFaulted) {
+            $msg = $($this.requestTask.Exception.InnerException.Message)
+            throw "request task is faulted $msg"
+        }
+
+        $this.response = $this.requestTask.Result
+
+        $this.isnewresult = $true
+
+        if ( ! $this.response.IsSuccessStatusCode ) {
+            Write-Error "Server returned HTTP status code: $($this.response.StatusCode)"
+        }
+
+        Write-Host "Response received! Status: $($this.response.StatusCode). Reading stream into byte array..." -ForegroundColor Green
         
-        # 5. Retrieve content stream asynchronously to read into raw bytes
-        $contentStreamTask = $response.Content.ReadAsStreamAsync()
+        $contentStreamTask = $this.response.Content.ReadAsStreamAsync()
         
         while (-not $contentStreamTask.IsCompleted) {
             Start-Sleep -Milliseconds 50
@@ -77,43 +133,86 @@ while ($true) {
         $stream = $contentStreamTask.Result
         $memoryStream = [System.IO.MemoryStream]::new()
         
-        # Stream bytes out safely 
         $stream.CopyTo($memoryStream)
-        [byte[]]$byteArray = $memoryStream.ToArray()
+        $this.byteArray = $memoryStream.ToArray()
         
-        # Clean up stream objects
         $memoryStream.Dispose()
         $stream.Dispose()
+        $this.response.Dispose()
 
-        # Output verification
-        Write-Host "Successfully read ($($byteArray.Length) bytes) into `$byteArray." -ForegroundColor Yellow
-        
+        Write-Host "Successfully read $($this.byteArray.Length) bytes" -ForegroundColor Yellow        
+    }
+
+    [hashtable] static ParseResult([byte[]]$byteArray) {
         $jsonPayload = [System.Text.Encoding]::UTF8.GetString($byteArray)
         Write-Output $jsonPayload
 
+        $tresponse = $null
+
         try {
             $jsonObj = $jsonPayload | ConvertFrom-Json
-            $response = Transform-PSCustomObject $jsonObj
+            $tresponse = Transform-PSCustomObject $jsonObj
         } catch {
 
         }
-        
-    } else {
-        Write-Error "Server returned HTTP status code: $($response.StatusCode)"
+
+        return $tresponse
     }
 
-    $client.Dispose()
+    [void] ProcessResponse([hashtable]$response) {
+        $this.timetoken = $response.t.t
 
-    $timetoken = $response.t.t
+        Write-Host "timetoken: $($this.timetoken)"
 
-    if ($response.m.Count -gt 0) {
+        if ($response.m.Count -le 0) {
+            return
+        }
+
+        Write-Host "response count: $($response.m.Count)"
+        
         foreach ($msg in $response.m) {
-            $json = $msg.d | ConvertTo-Json -Compress
-            Write-Host "New Message Received: $($msg.d | ConvertTo-Json -Compress)"
+            $pbmsg = $msg.d | ConvertTo-Json -Compress
+            Write-Host "New Message Received: $($pbmsg | ConvertTo-Json -Compress)"
+            $pbmsg = Transform-PSCustomObject($msg.d)
+            $this.pbmessages.Add($pbmsg)
         }
     }
 
-    Write-Host "timetoken: $timetoken"
+    [void] Iterate() {
+        Write-Host "starting new iteration..."
 
-    Start-Sleep -Milliseconds 1000
+        $this.Receive()
+        $this.ReadResult()
+
+        if ( ! $this.isnewresult ) {
+            return
+        }
+
+        $ht = [PubNub]::ParseResult($this.byteArray)
+        $this.isnewresult = $false
+        $this.byteArray = [byte[]]$null
+        
+        $this.ProcessResponse($ht)
+    }
+
+}
+
+$pb = [PubNub]::new()
+$pb.Init()
+$pb.Receive()
+
+while ( $true ) {
+    $pb.Iterate()
+
+    $pbmsg = @{
+        builtincmd="SendBroadcast";
+        cmdid=(Get-Random -Minimum 10000000 -Maximum 100000000);
+        destination="BROADCAST";
+        source="pscdp.relay.pubnub.ps1";
+        ts=(Get-Timestamp)
+    }
+    
+    $pb.PublishMessage($pbmsg)
+
+    Start-Sleep -Milliseconds 250
 }
