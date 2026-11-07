@@ -6,7 +6,7 @@
 Add-Type -AssemblyName System.Web
 Set-Location -LiteralPath (Split-Path -Parent -Path $MyInvocation.MyCommand.Definition)
 
-$scriptfname = [System.IO.Path]::GetFileNameWithoutExtension($PSCommandPath)
+$script:scriptfname = [System.IO.Path]::GetFileNameWithoutExtension($PSCommandPath)
 
 $scriptGuid = '70d8ab8e-fdb2-4076-9fd8-ba81c1be92e3' # Use a unique GUID for each script
 # $createdNew = $false
@@ -1287,15 +1287,6 @@ function Ping-DebugPort {
     return $targets
 }
 
-function Find-ActiveClientBrowser {
-    # should return debug port (9222 or 9223) and browser name
-    # of client browser if any
-}
-
-function Find-PubNubBrowser {
-    # should find the browser used to make pubnub connections
-}
-
 class PSCDPException : System.Exception {
 
     PSCDPException([string]$Message) : base($Message) {
@@ -1324,7 +1315,7 @@ class PSCDP {
     $results = [System.Collections.Generic.List[PSCDPResult]]::new() 
     $errors = [System.Collections.Generic.List[hashtable]]::new() 
 
-    $consolecalls = [System.Collections.Generic.List[hashtable]]::new() 
+    $consolecalls = [System.Collections.Generic.List[PSCDPResult]]::new() 
 
     $targets = [System.Collections.Generic.List[PSCDPTarget]]::new()
 
@@ -1353,6 +1344,14 @@ class PSCDP {
         }
         
         return $false
+    }
+
+    [hashtable] GetSystemHealth() {
+        $ret = @{
+            issystemok=( $this.IsSocketHealthy() )
+        }
+
+        return $ret
     }
 
     PSCDP() {
@@ -1631,7 +1630,6 @@ class PSCDP {
         $attachedToTarget = $false
         $targetCreated = $false
         $targetDestroyed = $false
-        $bindingCalled = $false
         $consoleAPICalled = $false
         $executionContextCreated = $false
         $executionContextDestroyed = $false
@@ -1697,11 +1695,6 @@ class PSCDP {
             }
 
             $msght.Add('cmd', $cmd)
-        }
-
-        # not implemented
-        if ( $bindingCalled ) {
-            Log-Msg "pass"
         }
 
         if ( $consoleAPICalled ) {
@@ -2090,10 +2083,10 @@ class PubNub {
         $this.isnewresult = $true
 
         if ( ! $this.response.IsSuccessStatusCode ) {
-            Write-Error "Server returned HTTP status code: $($this.response.StatusCode)"
+            Log-Msg "Server returned HTTP status code: $($this.response.StatusCode)"
         }
 
-        Write-Host "Response received! Status: $($this.response.StatusCode). Reading stream into byte array..." -ForegroundColor Green
+        Log-Msg "Response received! Status: $($this.response.StatusCode). Reading stream into byte array..."
         
         $contentStreamTask = $this.response.Content.ReadAsStreamAsync()
         
@@ -2111,7 +2104,7 @@ class PubNub {
         $stream.Dispose()
         $this.response.Dispose()
 
-        Write-Host "Successfully read $($this.byteArray.Length) bytes" -ForegroundColor Yellow        
+        Log-Msg "Successfully read $($this.byteArray.Length) bytes"
     }
 
     [hashtable] static ParseResult([byte[]]$byteArray) {
@@ -2133,19 +2126,26 @@ class PubNub {
     [void] ProcessResponse([hashtable]$response) {
         $this.timetoken = $response.t.t
 
-        Write-Host "timetoken: $($this.timetoken)"
+        Log-Msg "timetoken: $($this.timetoken)"
 
         if ($response.m.Count -le 0) {
             return
         }
 
-        Write-Host "response count: $($response.m.Count)"
+        Log-Msg "response count: $($response.m.Count)"
         
         foreach ($msg in $response.m) {
             $pbmsg = $msg.d | ConvertTo-Json -Compress
-            Write-Host "New Message Received: $($pbmsg | ConvertTo-Json -Compress)"
+            Log-Msg "New Message Received: $($pbmsg | ConvertTo-Json -Compress)"
             $pbmsg = Transform-PSCustomObject($msg.d)
-            $this.pbmessages.Add($pbmsg)
+
+            if ( $pbmsg['destination'] -eq "BROADCAST" ) {
+                # ignore
+            } elseif ( $pbmsg['destination'] -eq $script:scriptfname ) {
+                $this.pbmessagesin.Add($pbmsg)
+            } elseif ( $pbmsg['source'] -eq $script:scriptfname ) {
+                $this.pbmessagesout.Add($pbmsg)
+            }
 
             if ( $null -ne $this.EventHandler ) {
                 $this.EventHandler.Invoke($pbmsg)
@@ -2154,8 +2154,6 @@ class PubNub {
     }
 
     [void] Iterate() {
-        Write-Host "starting new iteration..."
-
         $this.Receive()
         $this.ReadResult()
 
@@ -2177,10 +2175,12 @@ class PubNub {
 $script:msedge_debugport = 9222
 $script:chrome_debugport = 9223
 
-$clientport = $script:msedge_debugport
-
-$script:clientws = [PSCDP]::new($clientport, "clientws")
-$script:clientws.ConnectCdp()
+try {
+    $script:clientws = [PSCDP]::new($script:chrome_debugport, "clientws")
+    $script:clientws.ConnectCdp()
+} catch {
+    Log-Msg $_
+}
 
 $keyboardlogger = {
     try {
@@ -2195,7 +2195,7 @@ $keyboardlogger = {
 # $ps = [powershell]::Create().AddScript($keyboardlogger)
 # $asyncResult = $ps.BeginInvoke()
 
-if ( [string]::IsNullOrWhiteSpace($scriptfname) ) {
+if ( [string]::IsNullOrWhiteSpace($script:scriptfname) ) {
     $scriptfname = "pscdp.relay.ps1"
 }
 
