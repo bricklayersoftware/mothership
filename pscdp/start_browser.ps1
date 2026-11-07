@@ -1,7 +1,3 @@
-$mothershipurl = "https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/client_pubnub"
-
-$processes = Get-CimInstance Win32_Process | Select-Object Name, ProcessId, CommandLine, ExecutablePath
-
 function PingDebugPort {
     param([string]$debugport)
 
@@ -199,6 +195,12 @@ $launch_vivaldi = {
     LaunchBrowser $debugport $path $datadir
 }
 
+#####
+
+$mothershipurl = "https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/client_pubnub"
+
+$processes = Get-CimInstance Win32_Process | Select-Object Name, ProcessId, CommandLine, ExecutablePath
+
 & subst Z: C:\
 
 $msedge_port ="9222"
@@ -220,11 +222,23 @@ $machine_configs.Add(
 $machine_configs.Add(
     @{
         computername=$null;
-        username="LC2022";
+        username="General";
         launch_pubnub_action=$launch_msedge;
         pubnub_debug_port=$msedge_port
         launch_client_action=$launch_chrome
         client_debug_port=$chrome_port
+        chrome_path="C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+    }
+)
+
+$machine_configs.Add(
+    @{
+        computername=$null;
+        username="LC2022";
+        launch_pubnub_action=$launch_msedge;
+        pubnub_debug_port=$msedge_port
+        launch_client_action=$launch_msedge
+        client_debug_port=$msedge_port
         chrome_path="C:\Users\LC2022\AppData\Local\uchrome\ungoogled-chromium-portable.exe"
     }
 )
@@ -234,11 +248,6 @@ $machine_config = $machine_configs | Where-Object {
 } | Select-Object -First 1
 
 $script:chrome_path = $machine_config['chrome_path']
-
-$action = $machine_config['launch_pubnub_action']
-$port = $machine_config['pubnub_debug_port']
-
-& $action $port
 
 $action = $machine_config['launch_client_action']
 $port = $machine_config['client_debug_port']
