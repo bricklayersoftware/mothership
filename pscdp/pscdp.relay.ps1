@@ -4,7 +4,6 @@
 # Wait-Debugger
 
 Add-Type -AssemblyName System.Web
-Set-Location -LiteralPath (Split-Path -Parent -Path $MyInvocation.MyCommand.Definition)
 
 $script:scriptfname = [System.IO.Path]::GetFileNameWithoutExtension($PSCommandPath)
 
