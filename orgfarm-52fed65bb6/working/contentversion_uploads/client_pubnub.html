@@ -207,6 +207,9 @@
     <br/>
 
     <!-- DOM explorer -->
+    <div id="jsonTree">
+    </div>
+
     <table border="1">
         <tr>
             <th>DOM (
@@ -218,7 +221,6 @@
 
     <table id="domList">
     </table>
-
 
     <br/>
     <br/>
@@ -1238,6 +1240,8 @@
             result = result || {};
 
             refreshTable('domList', result);
+
+            reloadJsonTree(result);
         }
 
         function process_GetFrontendUrls(result, message) {
@@ -1328,7 +1332,84 @@
 
     </script>
 
+    <!-- DOM json tree-->
+    <script>
+        function isPrimitive(obj) {
+            if (typeof obj !== 'object' || obj === null) {
+                return true;
+            }
 
+            return false;
+        }
+
+        function insertContainerRowObj(row, key, value, isArray) {
+
+            const toggleBtn = document.createElement('a');
+            toggleBtn.textContent = '[-] ' + (isArray ? 'index: ' : '' ) + '['+key+']';
+            toggleBtn.style.cursor = 'pointer';
+            toggleBtn.style.fontWeight = 'bold';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.style.display = 'block';
+            let elem = createJSONTree(value);
+            contentDiv.appendChild(elem);
+
+            toggleBtn.onclick = function () {
+                if (contentDiv.style.display === 'none') {
+                    contentDiv.style.display = 'block';
+                    toggleBtn.textContent = '[-] ' + (isArray ? 'index: ' : '') + key + (isArray ? ' ' : ':');
+                } else {
+                    contentDiv.style.display = 'none';
+                    toggleBtn.textContent = '[+] ' + (isArray ? 'index: ' : '') + key + (isArray ? ' ' : ':');
+                }
+            };
+
+            row.appendChild(toggleBtn);
+            row.appendChild(contentDiv);
+        }
+
+        function createJSONTree(data) {
+            if ( isPrimitive(data) ) { //(typeof data !== 'object' || data === null) {
+                return document.createTextNode(String(data));
+            }
+
+            const container = document.createElement('div');
+            container.style.marginLeft = '15px';
+
+            const isArray = Array.isArray(data);
+
+            for (const [key, value] of Object.entries(data)) {
+                const row = document.createElement('div');
+                row.style.margin = '2px 0';
+
+                if ( isPrimitive(value) ) {
+                    row.classList.add("terminal");
+
+                    const textNode = document.createTextNode(
+                        (isArray ? 'index: ' : '' ) + '[' + key + ']: ' + String(value)
+                    );
+
+                    row.appendChild(textNode);
+                } else {
+                    row.classList.add("container");
+                    insertContainerRowObj(row, key, value, isArray);
+                }
+
+                container.appendChild(row);
+            }
+
+            return container;
+        }
+
+        function reloadJsonTree(data) {
+            const jsonTree = document.getElementById('jsonTree');
+
+            jsonTree.replaceChildren();
+
+            jsonTree.appendChild(createJSONTree(data));
+        }
+
+    </script>
 </body>
 
 </html>

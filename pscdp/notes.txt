@@ -1,7 +1,7 @@
-    # DOM.querySelector
-    # DOM.getOuterHTML
-    # DOM.describeNode
-    # DOM.resolveNode
+# DOM.querySelector
+# DOM.getOuterHTML
+# DOM.describeNode
+# DOM.resolveNode
 
 nodeId=1
 backendNodeId=1

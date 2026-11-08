@@ -53,8 +53,34 @@
         return false;
     }
 
+    function insertContainerRowObj(row, key, value, isArray) {
+
+        const toggleBtn = document.createElement('a');
+        toggleBtn.textContent = '[-] ' + (isArray ? 'index: ' : '' ) + '['+key+']';
+        toggleBtn.style.cursor = 'pointer';
+        toggleBtn.style.fontWeight = 'bold';
+
+        const contentDiv = document.createElement('div');
+        contentDiv.style.display = 'block';
+        let elem = createJSONTree(value);
+        contentDiv.appendChild(elem);
+
+        toggleBtn.onclick = function () {
+            if (contentDiv.style.display === 'none') {
+                contentDiv.style.display = 'block';
+                toggleBtn.textContent = '[-] ' + (isArray ? 'index: ' : '') + key + (isArray ? ' ' : ':');
+            } else {
+                contentDiv.style.display = 'none';
+                toggleBtn.textContent = '[+] ' + (isArray ? 'index: ' : '') + key + (isArray ? ' ' : ':');
+            }
+        };
+
+        row.appendChild(toggleBtn);
+        row.appendChild(contentDiv);
+    }
+
     function createJSONTree(data) {
-      if (typeof data !== 'object' || data === null) {
+      if ( isPrimitive(data) ) { //(typeof data !== 'object' || data === null) {
         return document.createTextNode(String(data));
       }
 
@@ -66,38 +92,18 @@
       for (const [key, value] of Object.entries(data)) {
         const row = document.createElement('div');
         row.style.margin = '2px 0';
-        row.classList.add("container");
 
-        if (typeof value === 'object' && value !== null) {
-          // Toggle button for nested objects/arrays
-          const toggleBtn = document.createElement('a');
-          toggleBtn.textContent = '[-] ' + (isArray ? 'index: ' : '' ) + key + (isArray ? '' : ':');
-          toggleBtn.style.cursor = 'pointer';
-          toggleBtn.style.fontWeight = 'bold';
+        if ( isPrimitive(value) ) {
+            row.classList.add("terminal");
 
-          const contentDiv = document.createElement('div');
-          contentDiv.style.display = 'block';
-          row.classList.add("terminal");
-          contentDiv.appendChild(createJSONTree(value));
+            const textNode = document.createTextNode(
+                (isArray ? 'index: ' : '' ) + '[' + key + ']: ' + String(value)
+            );
 
-          toggleBtn.onclick = function () {
-            if (contentDiv.style.display === 'none') {
-              contentDiv.style.display = 'block';
-              toggleBtn.textContent = '[-] ' + key + (isArray ? '' : ':');
-            } else {
-              contentDiv.style.display = 'none';
-              toggleBtn.textContent = '[+] ' + key + (isArray ? '' : ':');
-            }
-          };
-
-          row.appendChild(toggleBtn);
-          row.appendChild(contentDiv);
+            row.appendChild(textNode);
         } else {
-          // Primitive value (string, number, boolean, etc.)
-          const textNode = document.createTextNode(
-            (isArray ? 'index: ' : '' ) + '[' + key + ']: ' + String(value)
-          );
-          row.appendChild(textNode);
+            row.classList.add("container");
+            insertContainerRowObj(row, key, value, isArray);
         }
 
         container.appendChild(row);

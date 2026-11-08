@@ -789,6 +789,7 @@ $script:getdom_callback = {
         ts=$(Get-Timestamp)
         result=$null
         targetId=$Response.cmd.target.targetId
+        isbase64=$true
     }
 
     $jsonstr = $result | ConvertTo-Json -Depth 10 # TODO might not be adequate -- 
@@ -798,13 +799,7 @@ $script:getdom_callback = {
 
     $resultout['result'] = $base64str
 
-    $script:pubnubws.SendPBMessage($resultout)
-
-    # DOM.querySelector
-    # DOM.getOuterHTML
-    # DOM.describeNode
-    # DOM.resolveNode
-    
+    $script:pb.SendMessage($resultout)
 }
 
 function ProcessDOMObj {
@@ -1191,7 +1186,7 @@ function Process-BuiltInCommand {
 
         $targetid = $cmd.targetid
         
-        $pbmsg = @{ 
+        $cmd = @{ 
             method="DOM.getDocument";
             params = @{
               depth=1;
@@ -1202,7 +1197,7 @@ function Process-BuiltInCommand {
             callback=$script:getdom_callback
           }
           
-        $script:clientws.AddQueue( $pbmsg )
+        $script:clientws.AddQueue( $cmd )
 
         return
     } elseif ( $cmd.builtincmd -eq "GetScreenshot" ) {
