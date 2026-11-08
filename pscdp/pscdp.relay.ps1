@@ -2201,7 +2201,8 @@ if ( [string]::IsNullOrWhiteSpace($script:scriptfname) ) {
 $pb = [PubNub]::new()
 $pb.Init()
 $pb.EventHandler = {
-    [param]([hashtable]$pbmsg)
+    param([hashtable]$pbmsg)
+    
     Process-PubNubEvent -Message $pbmsg -cdpobj $script:clientws
 }
 
