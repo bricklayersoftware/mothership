@@ -1,6 +1,8 @@
-<!-- 20261014-1129 -->
+<!-- 20261108-1541 -->
 
-<!-- https://orgfarm-52fed65bb6-dev-ed.my.salesforce-sites.com/services/apexrest/StorageVault/pubnub_client -->
+<!-- https://onecompiler.com/html/3y5x8jr6s -->
+
+<!-- https://orgfarm-52fed65bb6-dev-ed.my.salesforce-sites.com/services/apexrest/pubnub_client -->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -1248,6 +1250,15 @@
         }
 
         function process_GetTargets(result, message) {
+            try {
+                if ( message.isbase64 ) {
+                    result = atob(result);
+                    result = JSON.parse(result);
+                }
+            } catch (e) {
+
+            }
+
             let targets = result;
             // TODO validate targets before updating
             targetslist = targets;

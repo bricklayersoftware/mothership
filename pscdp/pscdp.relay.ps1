@@ -5,7 +5,7 @@
 
 Add-Type -AssemblyName System.Web
 
-$script:scriptfname = [System.IO.Path]::GetFileNameWithoutExtension($PSCommandPath)
+$script:scriptfname = [System.IO.Path]::GetFileName($PSCommandPath)
 
 $scriptGuid = '70d8ab8e-fdb2-4076-9fd8-ba81c1be92e3' # Use a unique GUID for each script
 # $createdNew = $false
@@ -1227,11 +1227,11 @@ function Process-BuiltInCommand {
 
     $json = $result | ConvertTo-Json -Depth 10
     $tbytes = [System.Text.Encoding]::UTF8.GetBytes($json)
-    $jsonb = "`"" + [System.Convert]::ToBase64String($tbytes) + "`""
+    $jsonb = [System.Convert]::ToBase64String($tbytes)
 
     $resultout['result'] = $jsonb
 
-    $script:pb.PublishMessage($resultout)
+    $script:pb.SendMessage($resultout)
 }
 
 # NOTE only supports pb messages with builtincmd payload
@@ -1379,7 +1379,7 @@ class PSCDP {
         $stargets = [System.Collections.Generic.List[PSCDPTarget]]::new()
 
         $stargets = $ttargets | Where-Object { 
-            $_.type -eq "page" -and ( ! ( $_.url.StartsWith("chrome-extension://") ) ) -and ( ! ( $_.url.StartsWith("extension://") ) )
+            $_.type -eq "page" -and ( ! ( $_.url.StartsWith("chrome-extension://") ) ) -and ( ! ( $_.url.StartsWith("extension://") ) ) -and ( ! ( $_.url.StartsWith("devtools://") ) )
         } | ForEach-Object {
             $target = @{}
             $_.psobject.Properties | ForEach-Object { 
@@ -1985,8 +1985,13 @@ class PubNub {
     $byteArray = $null
     $requestTask = $null
 
+    $sendQueue = [System.Collections.Generic.List[hashtable]]::new()
+
     $pbmessagesin = [System.Collections.Generic.List[hashtable]]::new()
     $pbmessagesout = [System.Collections.Generic.List[hashtable]]::new()
+
+    $broadcastsin = [System.Collections.Generic.List[hashtable]]::new()
+    $broadcastsout = [System.Collections.Generic.List[hashtable]]::new()
 
     [void] Init() {
         $this.handler = [System.Net.Http.HttpClientHandler]::new()
@@ -2020,6 +2025,10 @@ class PubNub {
         return $uri
     }
 
+    [void] SendMessage([hashtable]$msg) {
+        $this.sendQueue.Add($msg)
+    }
+
     [string] PublishMessage([hashtable]$payload) {
 
         if ( ! $null -eq $payload -and $payload -is [hashtable] ) {
@@ -2043,7 +2052,6 @@ class PubNub {
 
         return $null
     }
-
 
     [void] ReadResult() {
         if ( ! $this.isreceive ) {
@@ -2123,10 +2131,19 @@ class PubNub {
             $pbmsg = Transform-PSCustomObject($msg.d)
 
             if ( $pbmsg['destination'] -eq "BROADCAST" ) {
-                # ignore
-            } elseif ( $pbmsg['destination'] -eq $script:scriptfname ) {
+
+                if ( ( $pbmsg['source'] -ne $script:scriptfname ) ) {
+                    $this.broadcastsin.Add($pbmsg)
+                } else {
+                    $this.broadcastsout.Add($pbmsg)   
+                }
+            } 
+            
+            if ( $pbmsg['destination'] -eq $script:scriptfname ) {
                 $this.pbmessagesin.Add($pbmsg)
-            } elseif ( $pbmsg['source'] -eq $script:scriptfname ) {
+            } 
+            
+            if ( $pbmsg['source'] -eq $script:scriptfname ) {
                 $this.pbmessagesout.Add($pbmsg)
             }
 
@@ -2137,6 +2154,20 @@ class PubNub {
     }
 
     [void] Iterate() {
+        $this.LogState()
+
+        $rnd = Get-Random -Minimum 1 -Maximum 501
+        if ( $rnd -le 10 ) {
+            $this.Broadcast()
+        }
+
+        if ( $null -ne $this.sendQueue -and $this.sendQueue.Count -gt 0 ) {
+            $msg = $this.sendQueue[0]
+            $this.sendQueue.RemoveAt(0)
+
+            $result = $this.PublishMessage($msg)
+        }
+
         $this.Receive()
         $this.ReadResult()
 
@@ -2151,6 +2182,29 @@ class PubNub {
         $this.ProcessResponse($ht)
     }
 
+    [void] LogState() {
+        $msgstrs = @()
+        $msgstrs += "[PubNub]"
+        $msgstrs += "[sendQueue: $($this.sendQueue.Count)]"
+        $msgstrs += "[msgs in: $($this.pbmessagesin.Count) msgs out: $($this.pbmessagesout.Count)]"
+        $msgstrs += "[broadcasts in: $($this.broadcastsin.Count) broadcasts out: $($this.broadcastsout.Count)]"
+
+        $msgstr = $msgstrs -join " "
+        Log-Msg $msgstr
+    }
+
+    [void] Broadcast() {
+
+        $msg = @{
+            builtincmd="SendBroadcast"
+            source=$script:scriptfname
+            destination="BROADCAST"
+            ts=$(Get-Timestamp)
+            cmdid=$(Get-Random -Minimum 10000000 -Maximum 100000000)
+        }
+
+        $this.SendMessage($msg)
+    }
 }
 
 <# --- #>

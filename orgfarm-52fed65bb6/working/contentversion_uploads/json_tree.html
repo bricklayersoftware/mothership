@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Plain JS Collapsible JSON Tree</title>
+    <style>
+        body {
+            font-family: "Courier New", Courier, monospace;
+        }
+    </style>
+</head>
+<body>
+
+  <h2>JSON Tree Viewer (No CSS)</h2>
+  <div id="tree-container"></div>
+
+  <script>
+    const sampleData = {
+  "id": 101,
+  "name": "Alice Smith",
+  "isActive": true,
+  "score": 94.5,
+  "notes": null,
+  "profile": {
+    "role": "Administrator",
+    "department": "Engineering"
+  },
+  "tags": [
+    "team-lead",
+    "remote",
+    "internal"
+  ],
+  "projects": [
+  2134,562,534,
+    {
+      "projectId": "P-401",
+      "title": "Alpha Launch",
+      "status": "Completed"
+    },
+    {
+      "projectId": "P-402",
+      "title": "Beta Testing",
+      "status": "In Progress"
+    }
+  ]
+};
+
+    function isPrimitive(obj) {
+        if (typeof obj !== 'object' || obj === null) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function createJSONTree(data) {
+      if (typeof data !== 'object' || data === null) {
+        return document.createTextNode(String(data));
+      }
+
+      const container = document.createElement('div');
+      container.style.marginLeft = '15px';
+
+      const isArray = Array.isArray(data);
+
+      for (const [key, value] of Object.entries(data)) {
+        const row = document.createElement('div');
+        row.style.margin = '2px 0';
+        row.classList.add("container");
+
+        if (typeof value === 'object' && value !== null) {
+          // Toggle button for nested objects/arrays
+          const toggleBtn = document.createElement('a');
+          toggleBtn.textContent = '[-] ' + (isArray ? 'index: ' : '' ) + key + (isArray ? '' : ':');
+          toggleBtn.style.cursor = 'pointer';
+          toggleBtn.style.fontWeight = 'bold';
+
+          const contentDiv = document.createElement('div');
+          contentDiv.style.display = 'block';
+          row.classList.add("terminal");
+          contentDiv.appendChild(createJSONTree(value));
+
+          toggleBtn.onclick = function () {
+            if (contentDiv.style.display === 'none') {
+              contentDiv.style.display = 'block';
+              toggleBtn.textContent = '[-] ' + key + (isArray ? '' : ':');
+            } else {
+              contentDiv.style.display = 'none';
+              toggleBtn.textContent = '[+] ' + key + (isArray ? '' : ':');
+            }
+          };
+
+          row.appendChild(toggleBtn);
+          row.appendChild(contentDiv);
+        } else {
+          // Primitive value (string, number, boolean, etc.)
+          const textNode = document.createTextNode(
+            (isArray ? 'index: ' : '' ) + '[' + key + ']: ' + String(value)
+          );
+          row.appendChild(textNode);
+        }
+
+        container.appendChild(row);
+      }
+
+      return container;
+    }
+
+    const containerEl = document.getElementById('tree-container');
+    containerEl.appendChild(createJSONTree(sampleData));
+  </script>
+
+</body>
+</html>
