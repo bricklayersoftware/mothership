@@ -39,3 +39,5 @@ class JSCDP {
         // TODO pbmsg should be destined for client_pubnub.html 
     }
 }
+
+export { JSCDP, JSPubNub };

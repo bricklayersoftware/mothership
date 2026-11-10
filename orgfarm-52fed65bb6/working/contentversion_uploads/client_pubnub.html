@@ -56,6 +56,9 @@
     </style>
 
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.12.0.3.min.js"></script>
+    <script src="./client_pubnub.helper.js" type="text/javascript"></script>
+    <script src="./client_pubnub.js" type="text/javascript"></script>
+
 </head>
 <body>
     <h1>PubNub Message Publisher</h1>
@@ -397,13 +400,10 @@
         </tr>
     </table>
  
-    <script src="./client_pubnub.helper.js"></script>
-    <script src="./client_pubnub.js"></script>
 
 
     <!-- globals + pubnub -->
-    <script>
-
+    <script type="module">
         let jscodelist = {
             "GetBoundingRect":`(() => {
 

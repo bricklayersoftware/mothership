@@ -2,11 +2,13 @@
   "compilerOptions": {
     "module": "commonjs",
     "target": "es6",
-    "checkJs": false
+    "checkJs": false,
+    "allowJs": true,
+    "noEmit": true,
   },
     "include": [
     "**/*.js",
-    "**/*.html"
+    "**/*.html" 
   ],
   "exclude": ["node_modules"]
 }
