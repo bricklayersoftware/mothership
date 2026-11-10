@@ -350,6 +350,9 @@ global without sharing class PublicRestService {
             if ( endpoint == 'client_pubnub' ) {
                 serve_ui(req,res, endpoint + '.html');
                 return;
+            } else if ( endpoint.endsWith('js') ) {
+                serve_ui(req,res, endpoint);
+                return;
             } else {
                 res.responseBody = Blob.valueOf('requested endpoint not supported');
                 res.statusCode = 400;

@@ -25,3 +25,5 @@ sf org list
 
 curl -v -X POST --data-binary "@customers-100.csv" <tplmothership>/ow/upload.php?filename=customers-100.csv
 curl -v -T customers-100.csv <tplmothership>/ow/upload.php?filename=cust.csv
+
+set PATH=%PATH%;C:\Binaries\sfdx\client\bin

