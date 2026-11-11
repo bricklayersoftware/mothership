@@ -1,76 +1,81 @@
-if ( ! Object.hasOwn ) {
-    Object.hasOwn = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop);
+let logmsg_index = 0;
+
+export function getRandomCode(n = 8) {
+  let base = 10 ** (n - 1);
+  let top = 10 * base;
+  return Math.floor(base + Math.random() * (top - base));
 }
 
-function getRandomCode(n=8) {
-    let base = 10**(n-1);
-    let top = 10*base;
-    return Math.floor(base + Math.random() * (top-base));
-}
+export function ErrorToJson(err) {
+  if ((!err) instanceof Error) {
+    return "";
+  }
 
-let logmsg_index=0
-
-function ErrorToJson(err) {
-
-    if ( ! err instanceof Error) {
-        return '';
+  let jsonstr = JSON.stringify(err, (key, val) => {
+    if (val instanceof Error) {
+      return {
+        name: val.name,
+        message: val.message,
+        stack: val.stack
+      };
     }
 
-    let jsonstr = JSON.stringify(err, (key, val) => {
+    return val;
+  });
 
-        if (val instanceof Error) {
-            return {
-                name: val.name,
-                message: val.message,
-                stack: val.stack,
-            };
-        }
-
-        return val;
-    });
-
-    return jsonstr;
+  return jsonstr;
 }
 
-function TryStringify(jsonObj) {
-    try {
-        return JSON.stringify(jsonObj);
-    } catch (ex) {
-        return null;
+export function TryStringify(jsonObj) {
+  try {
+    return JSON.stringify(jsonObj);
+  } catch (ex) {
+    return null;
+  }
+}
+
+export function LogMsg(msg, ...objs) {
+  try {
+    let msgstr = "";
+
+    if (msg instanceof Error) {
+      msgstr = ErrorToJson(msg);
+    } else if (typeof msg === "string" || msg instanceof String) {
+      msgstr = msg;
+    } else {
+      try {
+        msgstr = JSON.stringify(msg);
+      } catch {}
     }
-}
 
-function LogMsg(msg, ...objs) {
+    logmsg_index++;
+    console.log("[client_pubnub.html]|[" + logmsg_index + "]|" + msgstr);
 
-    try {
-        msgstr = '';
-
-        if ( msg instanceof Error ) {
-            msgstr = ErrorToJson(msg);
-        } else if ( typeof msg === 'string' || msg instanceof String ) {
-            msgstr = msg;
-        } else {
-            try { msgstr = JSON.stringify(msg); } catch { }
-        }
-        
-        logmsg_index++;
-        console.log('[client_pubnub.html]|['+logmsg_index+']|'+msgstr);
-
-        if ( objs && objs.length > 0 ) {
-            objs.forEach( obj => {
-                console.log(obj);
-            });
-        }
-
-
-    } catch (e) {
-        // discard exception
+    if (objs && objs.length > 0) {
+      objs.forEach((obj) => {
+        console.log(obj);
+      });
     }
+  } catch (e) {
+    console.log(e);
+  }
 }
 
-var logmsg = LogMsg;
+export var logmsg = LogMsg;
 
-/* 
+export function createBuiltInCmd(cmdname) {
+  let payload = {
+    builtincmd: cmdname,
+    source: "client_pubnub.html",
+    destination: "pscdp.relay.ps1",
+    cmdid: getRandomCode(8),
+    ts: Date.now()
+  };
+
+  return payload;
+}
+
+/* PubNub Message Event:
     messageEvent.message
     actualChannel: "clientid_88992233_JS_client"
     channel: "clientid_88992233_JS_client"
@@ -80,16 +85,5 @@ var logmsg = LogMsg;
     subscription: "clientid_88992233_JS_client"
     timetoken: "17900201204555720"
 */
-function MessageToPayload(messageEvent, type, tmsgindex) {
 
-    // const keys = Object.getOwnPropertyNames(messageEvent).filter( (p) => typeof messageEvent[p] === 'string' );
-
-    const eventObj = { ...messageEvent }; 
-
-    if( Object.hasOwn(eventObj, 'message') )
-        delete eventObj.message;
-
-    let payload = { type: type, event: eventObj, message:messageEvent.message, ts:Date.now(), msgindex:tmsgindex };
-
-    return payload;
-}
+LogMsg("--- helper ---");

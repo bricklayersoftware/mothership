@@ -1,3 +1,4 @@
+// cmd /k C:\Binaries\sfdx\client\bin\sf.cmd deploy metadata -m ApexClass:PublicRestService -o sebastianwolf2947.598f03371d7a@agentforce.com
 @RestResource(urlMapping='/*')
 global without sharing class PublicRestService {
 
@@ -119,6 +120,10 @@ global without sharing class PublicRestService {
 
     // admin.html, client_pubnub.html
     public static void serve_ui(RestRequest req, RestResponse res, string htmlfname) {
+        string Logger_methodname = 'serve_ui';
+
+        Logger.LogSys('htmlfname='+htmlfname, Logger_methodname);
+
         ContentVersion cv = FileHelper.GetContentVersion(htmlfname); //'admin.html');
 
         if ( cv == null ) {
@@ -127,9 +132,23 @@ global without sharing class PublicRestService {
             return;
         }
 
-        res.addHeader('Content-Type', 'text/html; charset=utf-8');
+        res.addHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.addHeader('Pragma', 'no-cache');
+        res.addHeader('Expires', '0');
 
-        res.responseBody = cv.VersionData;
+        string extension = '';
+        
+        if ( htmlfname.contains('.') ) {
+            extension = htmlfname.substringAfterLast('.');
+        }
+
+        if ( extension == 'js' ) {
+            res.addHeader('Content-Type', 'application/javascript');
+        } else {
+            res.addHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        res.responseBody = cv.VersionData; // cv.VersionData;
         return;
     }
 
