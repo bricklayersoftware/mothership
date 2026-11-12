@@ -505,10 +505,23 @@
         window.jspb = jspb;
         window.jscdp = jscdp;
 
+        jscdp.updatesHandler = function(updateEvent) {
+            if ( updateEvent == 'Targets' ) {
+                let targets = jscdp.getTargetsList();
+                jsui.refreshTargets(targets);
+            }
+        }
+
         jspb.messageHandler = function(messageEvent) {
             jsui.addMessage(messageEvent);
 
             jscdp.processPBMessage(messageEvent);
+
+            let opts = jsui.getOpts();
+
+            if ( opts['logPBMessage'] ) {
+                helper.logmsg('New PubNub Message: ', messageEvent);
+            }
         };
 
         jspb.connect();

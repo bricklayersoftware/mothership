@@ -246,7 +246,7 @@ class PSCDPCommand {
         return $out
     }
 
-    [hashtable]GetHashtable() {
+    [hashtable] GetHashtable() {
 
         $isexec = $false
         $execstatus = "UNKNOWN"
@@ -261,22 +261,13 @@ class PSCDPCommand {
             id=$this.id
             method=$this.method
             params=$this.params
+            targetId=$this.targetId
             sessionId=$this.sessionId
-            #callback=$this.callback
+            hascallback= ( $null -ne $this.callback )
             isinvoked=$this.isinvoked
-            iserror=$this.iserror
-            isbroadcast=$this.isbroadcast
-            isbrowserversion=$this.isbrowserversion
-            ispbping=$this.ispbping
             isexec=$isexec
             execstatus=$execstatus
             builtincmd=$this.builtincmd
-        }
-
-        $obj['hascallback']=$false
-
-        if ( $null -ne $this.callback ) {
-            $obj['hascallback']=$true
         }
 
         if ( $null -ne $this.target ) {
@@ -288,10 +279,6 @@ class PSCDPCommand {
         }
 
         $obj['response'] = $null
-
-        if ( $null -ne $this.response ) {
-            $obj['response'] = $this.response.GetHashtable()
-        }
 
         return $obj
     }
@@ -658,7 +645,7 @@ $script:captureScreenshot_callback = {
             $resultout['chunkindex'] = $i
             $resultout['remainderlength'] = $remainderlength
             
-            $script:pb.SendPBMessage($resultout)
+            $script:pb.SendMessage($resultout)
         }
     } catch {
         Log-Msg $_
@@ -666,7 +653,28 @@ $script:captureScreenshot_callback = {
 
 }
 
-# TODO implement logic to refresh targets list
+$script:attachToTarget_callback = {
+    param(
+        [object]$Response, [PSCDP]$cdpobj
+    )
+
+    $cmd =  $Response.cmd
+    $target = $cmd.target
+
+    if ( ! $Response.iserror ) {
+        $sessionId = $Response.result.sessionId
+
+        if ( [string]::IsNullOrWhiteSpace($sessionId) ) {
+            return
+        }
+
+        if ( $target.sessionId -ne $sessionId ) {
+            $target.sessionId = $sessionId
+        }
+    }
+    
+}
+
 $script:getTargets_callback = {
     param(
         [object]$Response, [PSCDP]$cdpobj
@@ -685,9 +693,17 @@ $script:getTargets_callback = {
         targetId=$Response.cmd.target.targetId
     }
 
-    $resultout['result'] = $Response.result.targetInfos
+    $ttargets = $Response.result.targetInfos
 
-    $script:pubnubws.SendPBMessage($resultout)
+    $cdpobj.UpdateTargets($ttargets)
+
+    $targets = $cdpobj.targets
+
+    $ttargets = $targets | ForEach-Object { $_.GetDict() }
+
+    $resultout['result'] = $ttargets
+
+    $script:pb.SendMessage($resultout)
 }
 
 $script:evaluate_callback = {
@@ -1344,6 +1360,41 @@ class PSCDP {
         $this.wsname = $wsname
     }
 
+    [void] UpdateTargets([PSCustomObject[]] $ttargets) {
+        
+        $stargets = [System.Collections.Generic.List[PSCDPTarget]]::new()
+
+        $stargets = $ttargets | Where-Object { 
+            $_.type -eq "page" -and ( ! ( $_.url.StartsWith("chrome-extension://") ) ) -and ( ! ( $_.url.StartsWith("extension://") ) ) -and ( ! ( $_.url.StartsWith("devtools://") ) )
+        } | ForEach-Object {
+            $target = @{}
+            $_.psobject.Properties | ForEach-Object { 
+                $key = $_.Name
+                
+                if ( $key -eq "id" ) {
+                    $key = "targetId"
+                }
+
+                $target[$key] = $_.Value 
+            }
+            
+            [PSCDPTarget]$target
+        }
+
+        $ht = @{}
+        
+        $this.targets | ForEach-Object {
+            $ht.Add($_.targetId, $_.sessionId)
+        }
+
+        $stargets | ForEach-Object {
+            $sid = $ht[$_.targetId]
+            $_.sessionId = $sid
+        }
+
+        $this.targets = $stargets
+    }
+
     [System.Uri] GetWSUrI() {
 
         if ( $null -ne $this.wsUri ) {
@@ -1462,7 +1513,13 @@ class PSCDP {
     
         $this.AddQueue( @{ method="Target.setDiscoverTargets"; params=@{ discover=$true} } ) 
 
-        $this.AddQueue( @{ method="Target.getTargets"; params=@{ filter=@( @{ type="page"; exclude=$false } ) } } ) 
+        $this.AddQueue( 
+            @{ 
+                method="Target.getTargets"; 
+                params=@{ filter=@( @{ type="page"; exclude=$false } ) }
+                # callback=$script:getTargets_callback
+            }
+        )
     }
 
     [PSCDPCommand] GetCommandByID([string]$id) {
@@ -1726,10 +1783,15 @@ class PSCDP {
                     $targetInfo = $ptarget
                 }
 
-                $this.AddQueue( @{ 
-                    method="Target.attachToTarget"; 
-                    params=@{ targetId=$targetInfo.targetId; flatten=$true }; 
-                } )
+                if ( [string]::IsNullOrWhiteSpace($targetInfo.sessionId) ) {
+                    $this.AddQueue( @{ 
+                        method="Target.attachToTarget"; 
+                        params=@{ targetId=$targetInfo.targetId; flatten=$true }; 
+                        callback=$script:attachToTarget_callback;
+                        target=$targetInfo;
+                        targetid=$targetInfo.targetId
+                    } )
+                }
             }
             
         }
@@ -1768,8 +1830,9 @@ class PSCDP {
                     } | ForEach-Object { $_.sessionId = $sessionId }
                 }
 
+                # anchor
                 if ( ! $targetInfo.enable_init ) {
-                    $this.LoadQueue($targetInfo)
+                    # $this.LoadQueue($targetInfo)
                 }
             }
             

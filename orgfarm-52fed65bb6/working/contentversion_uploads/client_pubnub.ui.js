@@ -1,4 +1,5 @@
 const helper = window.helper;
+let jscdp = window.jscdp;
 
 helper.logmsg('--- client_pubnub.ui.js ---');
 
@@ -192,7 +193,7 @@ export function addTarget(target) {
     }
 
     let newRow = tbody.insertRow(-1);
-    newCell = newRow.insertCell();
+    let newCell = newRow.insertCell();
     newCell.textContent = '-------------------- ';
     newCell.style.backgroundColor = "grey";
     newCell.colSpan = 2;
@@ -290,14 +291,10 @@ export function refreshCommandsTable(commands) {
 }
 
 export function refreshTargetIdList(targets) {
-    console.log('refreshTargetIdList');
-
     let dropdown = document.getElementById('targetIdList');
     dropdown.options.length = 0;
 
     targets.forEach(target => {
-        console.log(target);
-
         const newOption = document.createElement("option");
 
         newOption.text = target.targetId;
@@ -312,8 +309,6 @@ export function refreshTargetIdList(targets) {
 }
 
 export function handleTargetIdChange(elem) {
-    console.log('handleTargetIdChange: ' + elem.value);
-
     let targetid = elem.value;
 
     let telem = document.getElementById('targetId');
@@ -324,6 +319,9 @@ export function handleTargetIdChange(elem) {
 
     telem = document.getElementById('targetIdList');
     telem.value = elem.value;
+
+    jscdp = window.jscdp;
+    let targetslist = jscdp.getTargetsList();
 
     let target = targetslist.find(target => {
         return target.targetId == targetid;

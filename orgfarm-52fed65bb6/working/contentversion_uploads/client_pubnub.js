@@ -126,12 +126,6 @@ export class JSPubNub {
 
             message: function (messageEvent) {
                 try {
-                    let opts = jsui.getOpts();
-
-                    if ( opts['logPBMessage'] ) {
-                        helper.logmsg("new PubNub message received: ", messageEvent);
-                    }
-
                     let payload = MessageToPayload(
                         messageEvent,
                         "PubNubMessage",
@@ -179,10 +173,19 @@ export class JSCDP {
         this.targets = [];
     }
 
+    updatesHandler = (event) => {
+        throw new JSCDPError('updatesHandler not implemented');
+    };
+
+    getTargetsList() {
+        return this.targets;
+    }
+
     setTargetsList(stargets) {
-        helper.logmsg('setTargetsList: ', stargets);
-        // convert to array of JSCDPTarget objects
+        // TODO convert to array of JSCDPTarget objects
         this.targets = stargets;
+
+        this.updatesHandler('Targets');
     }
 
     processPBMessage(messageEvent) {
@@ -255,9 +258,20 @@ export class JSCDP {
         containerDiv.appendChild(img);
     }
 
-    process_RefreshTargets(result) {
-        let targets = result;
-        refreshTargets(targets);
+    process_RefreshTargets(message) {
+        let result = message.result;
+
+        try {
+            if (message.isbase64) {
+                result = atob(result);
+            }
+
+            result = JSON.parse(result);
+        } catch (e) {
+
+        }
+
+        this.setTargetsList(result);
     }
 
     process_GetTargetText(result) {
@@ -305,8 +319,9 @@ export class JSCDP {
         try {
             if (message.isbase64) {
                 result = atob(result);
-                result = JSON.parse(result);
             }
+
+            result = JSON.parse(result);
         } catch (e) {
 
         }
@@ -315,7 +330,6 @@ export class JSCDP {
 
         this.setTargetsList(targets);
 
-        jsui.refreshTargets(targets);
     }
 
     process_ExecEvaluate(result, message) {
