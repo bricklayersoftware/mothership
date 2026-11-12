@@ -191,7 +191,7 @@ export function addTarget(target) {
 
     }
 
-    newRow = tbody.insertRow(-1);
+    let newRow = tbody.insertRow(-1);
     newCell = newRow.insertCell();
     newCell.textContent = '-------------------- ';
     newCell.style.backgroundColor = "grey";
@@ -430,6 +430,10 @@ export function expandTable(tableid) {
 export function clearTable(tableid) {
     const table = document.getElementById(tableid);
 
+    if ( ! table ) {
+        return; // anchor
+    }
+
     table.querySelectorAll('tbody').forEach(tbody => tbody.remove());
 }
 
@@ -541,7 +545,7 @@ export function getOpts() {
         "destination": destination,
         "logToConsole": document.getElementById('logToConsoleOpt').checked,
         "sendPBBroadcast": document.getElementById('sendPBBroadcastOpt').checked,
-        "logPBBroadcast":document.getElementById('logPBBroadcastOpt').checked
+        "logPBMessage":document.getElementById('logPBMessageOpt').checked
     };
 
     return opts;

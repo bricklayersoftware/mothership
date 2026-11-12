@@ -128,7 +128,7 @@ export class JSPubNub {
                 try {
                     let opts = jsui.getOpts();
 
-                    if ( opts['logPBBroadcast'] ) {
+                    if ( opts['logPBMessage'] ) {
                         helper.logmsg("new PubNub message received: ", messageEvent);
                     }
 
@@ -204,7 +204,7 @@ export class JSCDP {
         }
 
         try {
-            return cmdfunc(message);
+            return cmdfunc.call(this, message);
         } catch (ex) {
             helper.logmsg(ex);
         }

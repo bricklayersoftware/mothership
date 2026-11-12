@@ -128,9 +128,9 @@
             </td>
         </tr>
         <tr>
-            <td>Log PubNub Broadcasts:</td>
+            <td>Log PubNub Messages:</td>
             <td>
-                <input type="checkbox" id="logPBBroadcastOpt">
+                <input type="checkbox" id="logPBMessageOpt">
             </td>
         </tr>
     </table>
@@ -267,7 +267,7 @@
             <th>DOM (
             <a href="javascript:void(0);" onclick="collapseTable('resultsList');">Collapse</a> |                
             <a href="javascript:void(0);" onclick="expandTable('resultsList');">Expand</a> |
-            <a href="javascript:void(0);" onclick="clearTable('domList');">Clear</a> )</th>
+            <a href="javascript:void(0);" onclick="jsui.clearTable('domList');">Clear</a> )</th>
         </tr>
         <tr>
             <td>
@@ -316,7 +316,7 @@
             <a href="javascript:void(0);" onclick="collapseTable('commandsList');">Collapse</a> |                
             <a href="javascript:void(0);" onclick="expandTable('commandsList');">Expand</a> |
             <a href="javascript:void(0);" onclick="execBuiltInCmd('GetClientCommands');">Get Commands</a> |
-            <a href="javascript:void(0);" onclick="clearTable('commandsList');">Clear</a> )
+            <a href="javascript:void(0);" onclick="jsui.clearTable('commandsList');">Clear</a> )
         </th>
         </tr>
     </table>
@@ -370,8 +370,8 @@
                 Messages ( 
                     <a href="javascript:void(0);" onclick="expandTable('messagesTable');">Expand</a> | 
                     <a href="javascript:void(0);" onclick="collapseTable('messagesTable');">Collapse</a> | 
-                    <a href="javascript:void(0);" onclick="clearTable('messagesTable');">Clear</a> |
-                    <a href="javascript:void(0);" onclick="refreshMessages();">Refresh</a> )
+                    <a href="javascript:void(0);" onclick="jsui.clearTable('messagesTable');">Clear</a> |
+                    <a href="javascript:void(0);" onclick="toggleMessages();">Refresh</a> )
             </th>
         </tr>
         <tr>
