@@ -2,7 +2,7 @@
 
 <!-- https://onecompiler.com/html/3y5x8jr6s -->
 
-<!-- https://orgfarm-52fed65bb6-dev-ed.my.salesforce-sites.com/services/apexrest/pubnub_client -->
+<!-- https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/client_pubnub -->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -58,20 +58,6 @@
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.12.0.3.min.js"></script>
 
     <script>
-        /*
-        let scriptfnames = [
-            'client_pubnub.js','client_pubnub.helper.js','client_pubnub.ui.js'
-        ];
-
-        scriptfnames.forEach( fname => {
-            let salt = Math.random().toString().substring(2, 12);
-            let script = document.createElement('script');
-            script.src = `${fname}?salt=${salt}`;
-            script.type = 'module';
-            document.head.appendChild(script);
-        });
-        */
-
         if ( ! Object.hasOwn ) {
             Object.hasOwn = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop);
         }
@@ -141,6 +127,12 @@
                 <input type="checkbox" id="sendPBBroadcastOpt" checked>
             </td>
         </tr>
+        <tr>
+            <td>Log PubNub Broadcasts:</td>
+            <td>
+                <input type="checkbox" id="logPBBroadcastOpt">
+            </td>
+        </tr>
     </table>
 
     <br/>
@@ -150,7 +142,7 @@
         <tr>
             <td colspan="2">
                 <label for="builtinCommands">Built-In Commands:</label>
-                <select id="builtinCommands" name="builtinCommands">
+                <select id="builtinCommands">
                     <option value="SendTestMessage">SendTestMessage</option>
                     <option value="GetScreenCapture">GetScreenCapture</option>
                     <option value="GetKeyboardLog">GetKeyboardLog</option>
@@ -160,7 +152,7 @@
         </tr>
         <tr>
             <td>
-                <button onclick="execBuiltInCmd()">Issue Command</button></br></br>
+                <button onclick="execBuiltInCmd(document.getElementById('builtinCommands').value)">Issue Command</button>
             </td>
             <td>
             </td>
@@ -173,7 +165,7 @@
         <tr>
             <td>Targets:</td>
             <td>
-                <select id="targetIdList" name="targetIdList" onchange="handleTargetIdChange(this);">
+                <select id="targetIdList" onchange="handleTargetIdChange(this);">
                 </select>                  
             </td>
         </tr>
@@ -211,7 +203,7 @@
                 Command:
             </td>
             <td>
-                <select id="cmdname" name="cmdname" onchange="handleCmdnameChange(this);">
+                <select id="cmdname" name="cmdname">
                     <option value="ExecEvaluate">ExecEvaluate</option>                        
                     <option value="GetTargetText">GetTargetText</option>
                     <option value="GetTargetHTML">GetTargetHTML</option>
@@ -252,10 +244,10 @@
     <table border="1">
         <tr>
             <th>Built-In Commands (
-            <a href="javascript:void(0);" onclick="collapseTable('commandsList');">Collapse</a> |                
-            <a href="javascript:void(0);" onclick="expandTable('commandsList');">Expand</a> |
-            <a href="javascript:void(0);" onclick="sendMessage(createBuiltInCmd('GetClientCommands'));">Get Commands</a> |
-            <a href="javascript:void(0);" onclick="clearTable('commandsList');">Clear</a> )
+            <a href="javascript:void(0);" onclick="jsui.collapseTable('commandsList');">Collapse</a> |
+            <a href="javascript:void(0);" onclick="jsui.expandTable('commandsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="execBuiltInCmd('GetClientCommands'));">Get Commands</a> |
+            <a href="javascript:void(0);" onclick="jsui.clearTable('commandsList');">Clear</a> )
         </th>
         </tr>
     </table>
@@ -300,11 +292,11 @@
     <table border="1">
         <tr>
             <th>Targets (
-            <a href="javascript:void(0);" onclick="collapseTable('targetsList');">Collapse</a> |                
-            <a href="javascript:void(0);" onclick="expandTable('targetsList');">Expand</a> |
-            <a href="javascript:void(0);" onclick="clearTable('targetsList');">Clear</a> |
-            <a href="javascript:void(0);" onclick="sendMessage(createBuiltInCmd('GetTargets'));">Get Targets</a> |
-            <a href="javascript:void(0);" onclick="sendMessage(createBuiltInCmd('RefreshTargets'));">Refresh Targets</a>
+            <a href="javascript:void(0);" onclick="jsui.collapseTable('targetsList');">Collapse</a> |
+            <a href="javascript:void(0);" onclick="jsui.expandTable('targetsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="jsui.clearTable('targetsList');">Clear</a> |
+            <a href="javascript:void(0);" onclick="execBuiltInCmd('GetTargets'));">Get Targets</a> |
+            <a href="javascript:void(0);" onclick="execBuiltInCmd('RefreshTargets'));">Refresh Targets</a>
             )</th>
         </tr>
     </table>
@@ -323,7 +315,7 @@
             <th>CDP Commands (
             <a href="javascript:void(0);" onclick="collapseTable('commandsList');">Collapse</a> |                
             <a href="javascript:void(0);" onclick="expandTable('commandsList');">Expand</a> |
-            <a href="javascript:void(0);" onclick="sendMessage(createBuiltInCmd('GetClientCommands'));">Get Commands</a> |
+            <a href="javascript:void(0);" onclick="execBuiltInCmd('GetClientCommands');">Get Commands</a> |
             <a href="javascript:void(0);" onclick="clearTable('commandsList');">Clear</a> )
         </th>
         </tr>
@@ -356,10 +348,10 @@
         <tr>
             <th style="text-align: left;">
                 Console Logs ( 
-                    <a href="javascript:void(0);" onclick="expandTable('messagesTable');">Expand</a> | 
-                    <a href="javascript:void(0);" onclick="collapseTable('messagesTable');">Collapse</a> | 
-                    <a href="javascript:void(0);" onclick="clearTable('messagesTable');">Clear</a> |
-                    <a href="javascript:void(0);" onclick="refreshMessages();">Refresh</a> )
+                    <a href="javascript:void(0);" onclick="jsui.expandTable('consolelogsTable');">Expand</a> |
+                    <a href="javascript:void(0);" onclick="jsui.collapseTable('consolelogsTable');">Collapse</a> |
+                    <a href="javascript:void(0);" onclick="jsui.clearTable('consolelogsTable');">Clear</a> |
+                    <a href="javascript:void(0);" onclick="jsui.refreshTable();">Refresh</a> )
             </th>
         </tr>
     </table>
@@ -431,14 +423,17 @@
         <tr>
         </tr>
     </table>
- 
 
-
-    <!-- globals + pubnub -->
+    <!-- globals init -->
     <script type="module">
-        import { JSCDP, JSPubNub } from './client_pubnub.js?salt=12345';
         const helper = await import('./client_pubnub.helper.js?salt='+Date.now());
+        window.helper = helper;
+
         const jsui = await import('./client_pubnub.ui.js?salt='+Date.now());
+        window.jsui = jsui;
+
+        const jscdppb = await import('./client_pubnub.js?salt='+Date.now());
+        window.jscdppb = jscdppb;
 
         helper.LogMsg('--- client_pubnub.html ---');
 
@@ -454,10 +449,7 @@
                 })();`
         };
 
-        let screencapture_chunks=[];
-
-        let commandslist = [];
-        let targetslist = [];
+        let builtincmds = [];
 
         let pubnubconfig = {
             publishKey: "pub-c-bd83b994-1964-4760-9bf2-142ceadf7f66",
@@ -507,13 +499,16 @@
 
         }, 5000);
 
-        const jscdp = new JSCDP();
-        const jspb = new JSPubNub(pubnubconfig, client_channel);
+        const jscdp = new jscdppb.JSCDP();
+        const jspb = new jscdppb.JSPubNub(pubnubconfig, client_channel);
+
+        window.jspb = jspb;
+        window.jscdp = jscdp;
 
         jspb.messageHandler = function(messageEvent) {
             jsui.addMessage(messageEvent);
 
-            // jsui.processMessage(messageEvent);
+            jscdp.processPBMessage(messageEvent);
         };
 
         jspb.connect();
@@ -522,218 +517,10 @@
             jsui.toggleMessages(jspb.getMessages());
         } window.toggleMessages = toggleMessages;
 
-        function refreshMessages() {
-            jsui.refreshMessages(jspb.getMessages());
-        } window.refreshMessages = refreshMessages;
-
-    </script>
-
-    <!-- inbound/outbound messaging -->
-    <script type="module">
-        function sendMessage(payload) {
-            jspb.sendMessage(payload);
-        }
-
-        function processMessage(messageEvent) {
-
-            let message = messageEvent.message;
-
-            if ( message.destination != 'client_pubnub.html' ) {
-                return;
-            } else if ( message.builtincmd == 'BROADCAST' ) {
-                return;
-            }
-
-            let cmdfuncname = "process_" + message.builtincmd;
-            let cmdfunc = null;
-
-            if (typeof window[cmdfuncname] === "function") {
-                cmdfunc = window[cmdfuncname];
-            } else {
-                throw new Error(`built in cmd name does not exist ${cmdfuncname}`)
-            }
-
-            try {
-                return cmdfunc(message.result, message); // TODO refactor to use message
-            } catch (ex) {
-                helper.logmsg(ex);
-            }
-
-        }
-
-        function process_GetTargetScreenCapture(result, message) {
-
-            let chunkcount = message['chunkcount']
-            let chunksize = message['chunksize']
-            let chunkindex = message['chunkindex']
-            let remainderlength = message['remainderlength']
-            let imagedata = result['imagedata']
-            
-            screencapture_chunks.push({
-                chunkcount:chunkcount,
-                chunksize:chunksize,
-                chunkindex:chunkindex,
-                remainderlength:remainderlength,
-                imagedata:imagedata
-            });
-
-            if ( chunkindex == chunkcount - 1 ) {
-                combineChunks();
-            }
-        }
-
-        function combineChunks() {
-            console.log('combineChunks');
-
-            screencapture_chunks.sort((a, b) => Number(a.chunkindex) - Number(b.chunkindex));
-
-            let imagestr = '';
-            
-            for ( let i = 0; i<screencapture_chunks.length;i++) {
-                imagestr += screencapture_chunks[i].imagedata;
-            }
-
-            screencapture_chunks = [];
-
-            const containerDiv = document.getElementById('screen_capture');
-
-            const base64String = 'data:image/png;base64,'+imagestr;
-
-            const img = document.createElement('img');
-
-            img.src = base64String;
-            img.alt = 'Inserted Base64 Image';
-
-            containerDiv.appendChild(img);
-        }
-
-        function process_RefreshTargets(result) {
-            let targets = result;
-            refreshTargets(targets);
-        }
-
-        function process_GetTargetText(result) {
-            console.log('GetTargetText');
-            // TODO implement -- show text in ui
-        }
-
-        function process_GetClientCommands(result) {
-            refreshCommandsTable(result);
-        }
-
-        function process_GetTargetHTML(result, message) {        
-            helper.logmsg('GetTargetHTML');
-        }
-
-        function process_RefreshDOM(result, message) {
-
-            result = atob(result);
-
-            try {
-                result = JSON.parse(result);
-            } catch (ex) {
-                helper.logmsg(ex);
-            }
-
-            result = result || {};
-
-            refreshTable('domList', result);
-
-            reloadJsonTree(result);
-        }
-
-        function process_GetFrontendUrls(result, message) {
-
-            if (Array.isArray(result) && result.length > 0) {
-                result = result[0];
-            }
-
-            document.getElementById('devtoolsFrontendUrl').value = result.devtoolsFrontendUrl;
-        }
-
-        function process_GetTargets(result, message) {
-            try {
-                if ( message.isbase64 ) {
-                    result = atob(result);
-                    result = JSON.parse(result);
-                }
-            } catch (e) {
-
-            }
-
-            let targets = result;
-            // TODO validate targets before updating
-            targetslist = targets;
-            refreshTargets(targets);
-        }
-
-        function process_ExecEvaluate(result, message) {
-
-            result = atob(result);
-            try {
-                result = JSON.parse(result);
-            } catch (ex) {
-                
-            }
-
-            result = result || {};
-            
-            keys = [ 'builtincmd', 'cmdid', 'resultid', 'targetId' ];
-
-            keys.forEach( key => {
-                result[key] = message[key];
-            });
-            
-            addResult(result);
-        }
-
-    </script>
-
-    <!-- commands logic -->
-    <script>
         function execBuiltInCmd(cmdname) {
-            // TODO check if cmdname is supported
-            let cmdpayload = createBuiltInCmd(cmdname);
-            jspb.sendMessage(cmdpayload);
-        }
-
-        function executeTargetCmd() {
-            console.log('executeTargetCmd');
-
-            let targetId = getTargetId();
-
-            let cmdname = document.getElementById('cmdname').value;
-
-            if ( cmdname == 'RefreshDOM' ) {
-                return refreshDOM();
-            }
-
-            let payload = createBuiltInCmd(cmdname);
-
-            payload['targetid'] = targetId;
-
-            let expression = document.getElementById('evaluateCmd').value;
-
-            if ( cmdname == 'ExecEvaluate' ) {
-                const bytes = new TextEncoder().encode(expression);
-                const binaryString = String.fromCodePoint(...bytes);
-                const base64String = btoa(binaryString);
-
-                payload['expression'] = base64String;
-            }
-
-            sendMessage(payload);
-        }
-
-        function refreshDOM() {
-            let targetId = getTargetId();
-
-            let payload = createBuiltInCmd('RefreshDOM');
-            payload['targetid'] = targetId;
-
-            sendMessage(payload);
-        }
-
+            let payload = helper.createBuiltInCmd(cmdname);
+            jspb.sendMessage(payload);
+        } window.execBuiltInCmd = execBuiltInCmd;
     </script>
 
     <!-- DOM json tree-->

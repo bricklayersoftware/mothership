@@ -34,6 +34,26 @@ export function TryStringify(jsonObj) {
   }
 }
 
+export function isNullOrEmpty(value) {
+    return value == null || (typeof value === "string" && value.trim().length === 0);
+}
+
+function getLastEndpoint(urlString) {
+    try {
+        // 1. Parse the URL using the native browser/Node.js API
+        const url = new URL(urlString);
+
+        // 2. Grab the clean path, split by slashes, and filter out any trailing slash empty strings
+        const segments = url.pathname.split('/').filter(Boolean);
+
+        // 3. Return the last segment, or null/empty if there isn't one
+        return segments.length ? segments.at(-1) : '/';
+    } catch (error) {
+        console.error("Invalid URL provided", error);
+        return null;
+    }
+}
+
 export function LogMsg(msg, ...objs) {
   try {
     let msgstr = "";
@@ -49,7 +69,19 @@ export function LogMsg(msg, ...objs) {
     }
 
     logmsg_index++;
-    console.log("[client_pubnub.html]|[" + logmsg_index + "]|" + msgstr);
+    let module_name = "client_pubnub.html";
+    try {
+        let tmodule_name = import.meta.url;
+
+        if ( ! isNullOrEmpty(tmodule_name) ) {
+            module_name = getLastEndpoint(tmodule_name);
+        }
+
+    } catch (ex) {
+
+    }
+
+    console.log("["+module_name+"]|[" + logmsg_index + "]|" + msgstr);
 
     if (objs && objs.length > 0) {
       objs.forEach((obj) => {
@@ -86,4 +118,4 @@ export function createBuiltInCmd(cmdname) {
     timetoken: "17900201204555720"
 */
 
-LogMsg("--- helper ---");
+LogMsg("--- client_pubnub.helper.js ---");

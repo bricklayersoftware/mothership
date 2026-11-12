@@ -1,10 +1,10 @@
-import * as helper from "./client_pubnub.helper.js?";
-
+const helper = window.helper;
 const PubNub = window.PubNub;
+const jsui = window.jsui;
 
-helper.LogMsg("--- JSPubNub ---");
+helper.LogMsg("--- client_pubnub.js ---");
 
-function MessageToPayload(messageEvent, type, tmsgindex) {
+export function MessageToPayload(messageEvent, type, tmsgindex) {
     // const keys = Object.getOwnPropertyNames(messageEvent).filter( (p) => typeof messageEvent[p] === 'string' );
 
     const eventObj = { ...messageEvent };
@@ -22,15 +22,21 @@ function MessageToPayload(messageEvent, type, tmsgindex) {
     return payload;
 }
 
-class JSPubNubError extends Error {
+export class JSPubNubError extends Error {
     constructor(message) {
         super(message);
         this.name = "JSPubNubError";
     }
 }
 
+export class JSCDPError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "JSCDPError";
+    }
+}
 
-class JSPubNub {
+export class JSPubNub {
     msgindex = 1;
     messagelist = [];
     client_channel = "clientid_88992233_JS_client";
@@ -49,7 +55,14 @@ class JSPubNub {
         return this.messagelist;
     }
 
-    sendMessage(payload) {
+    sendMessage(payload, logmsg) {
+        if ( ! logmsg )
+            logmsg = false;
+
+        if ( logmsg ) {
+            helper.logmsg('sendMessage: ', payload);
+        }
+
         if (!this.pubnub) {
             throw new JSPubNubError('not connected to pubnub');
         }
@@ -62,13 +75,19 @@ class JSPubNub {
             (status, response) => {
                 if (status.error) {
                     payload.error = status;
-                    helper.LogMsg("Publish failed: " + status.toJSON());
+
+                    if ( logmsg ) {
+                        helper.LogMsg("Publish failed: " + status.toJSON());
+                    }
                 } else {
                     payload.response = response;
-                    helper.LogMsg(
-                        "Message published successfully with timetoken:" +
-                        response.timetoken
-                    );
+
+                    if ( logmsg ) {
+                        helper.LogMsg(
+                            "Message published successfully with timetoken:" +
+                            response.timetoken
+                        );
+                    }
                 }
             }
         );
@@ -80,6 +99,7 @@ class JSPubNub {
     }
 
     connect() {
+        helper.logmsg('connecting: ', this.pubnubconfig);
         this.pubnub = new PubNub(this.pubnubconfig);
 
         let pbinst = this;
@@ -106,7 +126,11 @@ class JSPubNub {
 
             message: function (messageEvent) {
                 try {
-                    helper.logmsg("new PubNub message received: ", messageEvent);
+                    let opts = jsui.getOpts();
+
+                    if ( opts['logPBBroadcast'] ) {
+                        helper.logmsg("new PubNub message received: ", messageEvent);
+                    }
 
                     let payload = MessageToPayload(
                         messageEvent,
@@ -131,13 +155,16 @@ class JSPubNub {
     }
 }
 
-class JSCDPCommand {}
+export class JSCDPCommand {}
 
-class JSCDPResult {}
+export class JSCDPResult {}
 
-class JSCDPTarget {}
+export class JSCDPTarget {}
 
-class JSCDP {
+export class JSCDP {
+    screencapture_chunks = null;
+    targets = [];
+
     constructor() {
         this.sendQueue = [];
 
@@ -152,9 +179,162 @@ class JSCDP {
         this.targets = [];
     }
 
-    processPBMessage(pbmsg) {
-        // TODO pbmsg should be destined for client_pubnub.html
+    setTargetsList(stargets) {
+        helper.logmsg('setTargetsList: ', stargets);
+        // convert to array of JSCDPTarget objects
+        this.targets = stargets;
+    }
+
+    processPBMessage(messageEvent) {
+        let message = messageEvent.message;
+
+        if (message.destination != 'client_pubnub.html') {
+            return;
+        } else if (message.builtincmd == 'BROADCAST') {
+            return;
+        }
+
+        let cmdfuncname = "process_" + message.builtincmd;
+        let cmdfunc = null;
+
+        if (typeof this[cmdfuncname] === "function") {
+            cmdfunc = this[cmdfuncname];
+        } else {
+            throw new JSCDPError(`built in cmd name does not exist ${cmdfuncname}`)
+        }
+
+        try {
+            return cmdfunc(message);
+        } catch (ex) {
+            helper.logmsg(ex);
+        }
+    }
+
+    process_GetTargetScreenCapture(result, message) {
+
+        let chunkcount = message['chunkcount']
+        let chunksize = message['chunksize']
+        let chunkindex = message['chunkindex']
+        let remainderlength = message['remainderlength']
+        let imagedata = result['imagedata']
+
+        screencapture_chunks.push({
+            chunkcount: chunkcount,
+            chunksize: chunksize,
+            chunkindex: chunkindex,
+            remainderlength: remainderlength,
+            imagedata: imagedata
+        });
+
+        if (chunkindex == chunkcount - 1) {
+            this.combineChunks();
+        }
+    }
+
+    combineChunks() {
+
+        screencapture_chunks.sort((a, b) => Number(a.chunkindex) - Number(b.chunkindex));
+
+        let imagestr = '';
+
+        for (let i = 0; i < screencapture_chunks.length; i++) {
+            imagestr += screencapture_chunks[i].imagedata;
+        }
+
+        screencapture_chunks = [];
+
+        const containerDiv = document.getElementById('screen_capture');
+
+        const base64String = 'data:image/png;base64,' + imagestr;
+
+        const img = document.createElement('img');
+
+        img.src = base64String;
+        img.alt = 'Inserted Base64 Image';
+
+        containerDiv.appendChild(img);
+    }
+
+    process_RefreshTargets(result) {
+        let targets = result;
+        refreshTargets(targets);
+    }
+
+    process_GetTargetText(result) {
+        console.log('GetTargetText');
+        // TODO implement -- show text in ui
+    }
+
+    process_GetClientCommands(result) {
+        refreshCommandsTable(result);
+    }
+
+    process_GetTargetHTML(result, message) {
+        helper.logmsg('GetTargetHTML');
+    }
+
+    process_RefreshDOM(result, message) {
+
+        result = atob(result);
+
+        try {
+            result = JSON.parse(result);
+        } catch (ex) {
+            helper.logmsg(ex);
+        }
+
+        result = result || {};
+
+        refreshTable('domList', result);
+
+        reloadJsonTree(result);
+    }
+
+    process_GetFrontendUrls(result, message) {
+
+        if (Array.isArray(result) && result.length > 0) {
+            result = result[0];
+        }
+
+        document.getElementById('devtoolsFrontendUrl').value = result.devtoolsFrontendUrl;
+    }
+
+    process_GetTargets(message) {
+        let result = message.result;
+
+        try {
+            if (message.isbase64) {
+                result = atob(result);
+                result = JSON.parse(result);
+            }
+        } catch (e) {
+
+        }
+
+        let targets = result;
+
+        this.setTargetsList(targets);
+
+        jsui.refreshTargets(targets);
+    }
+
+    process_ExecEvaluate(result, message) {
+
+        result = atob(result);
+        try {
+            result = JSON.parse(result);
+        } catch (ex) {
+
+        }
+
+        result = result || {};
+
+        keys = ['builtincmd', 'cmdid', 'resultid', 'targetId'];
+
+        keys.forEach(key => {
+            result[key] = message[key];
+        });
+
+        addResult(result);
     }
 }
-
-export { MessageToPayload, JSCDP, JSPubNub };

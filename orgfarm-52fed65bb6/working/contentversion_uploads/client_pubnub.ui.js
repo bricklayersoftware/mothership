@@ -1,4 +1,4 @@
-import * as helper from "./client_pubnub.helper.js?";
+const helper = window.helper;
 
 helper.logmsg('--- client_pubnub.ui.js ---');
 
@@ -112,8 +112,6 @@ export function showMessage(msg, opts) {
 }
 
 export function addMessage(message) {
-    helper.logmsg('addMessage');
-
     let opts = getOpts();
 
     if (!showMessage(message, opts)) {
@@ -542,7 +540,8 @@ export function getOpts() {
         "source": source,
         "destination": destination,
         "logToConsole": document.getElementById('logToConsoleOpt').checked,
-        "sendPBBroadcast": document.getElementById('sendPBBroadcastOpt').checked
+        "sendPBBroadcast": document.getElementById('sendPBBroadcastOpt').checked,
+        "logPBBroadcast":document.getElementById('logPBBroadcastOpt').checked
     };
 
     return opts;
