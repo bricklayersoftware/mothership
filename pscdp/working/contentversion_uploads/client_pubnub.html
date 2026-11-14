@@ -1,0 +1,641 @@
+<!-- 20261108-1541 -->
+
+<!-- https://onecompiler.com/html/3y5x8jr6s -->
+
+<!-- https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/client_pubnub -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PubNub Local File Example</title>
+
+    <style>
+        body {
+            /* Sets a clean, standard fixed-width font stack */
+            font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+        }
+
+        .large-textbox {
+            /* Sets the initial large rectangle size */
+            width: 100%;
+            max-width: 400px;
+            height: 100px;
+            
+            /* Applies the monospace font styling */
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            
+            /* Ensures the box is resizable both horizontally and vertically */
+            resize: both; 
+            overflow: auto;
+            
+            /* Optional styling for a cleaner look */
+            padding: 12px;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box; 
+        }
+
+        .code-input {
+            /* Enforce monospace font */
+            font-family: 'Courier New', Courier, monospace;
+            
+            resize: both; 
+            
+            width: 400px;
+            height: 100px;
+            min-width: 50px;
+            min-height: 10px;
+          }
+          
+          .collapsed {
+            display: none;
+          }
+
+    </style>
+
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.12.0.3.min.js"></script>
+
+    <script>
+        if ( ! Object.hasOwn ) {
+            Object.hasOwn = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop);
+        }
+
+        window.onerror = function (message, source, lineno, colno, error) {
+            console.error('Caught global error:', {
+                message,
+                source,
+                lineno,
+                colno,
+                stack: error ? error.stack : null
+            });
+
+            // Return true to prevent the error from firing the default console error / browser behavior
+            // Return false to let it bubble normally
+            return true;
+        };
+    </script>
+
+</head>
+<body>
+    <h1>PubNub Message Publisher</h1>
+
+    <!-- PubNuB configs -->
+    <table>
+        <tr>
+            <td><label for="pubnub_subscriber_key">PubNub Subscriber Key:</label></td>
+            <td style="width: 300px;">
+                <input style="width: 100%;" type="text" id="pubnub_subscriber_key" name="pubnub_subscriber_key">
+            </td>
+        </tr>
+        <tr>
+            <td><label for="pubnub_publisher_key">PubNub Publisher Key:</label></td>
+            <td style="width: 300px;">
+                <input style="width: 100%;" type="text" id="pubnub_publisher_key" name="pubnub_publisher_key">
+            </td>
+        </tr>
+        <tr>
+            <td><label for="pubnub_uuid">PubNub UUID:</label></td>
+            <td style="width: 300px;">
+                <input style="width: 100%;" type="text" id="pubnub_uuid" name="pubnub_uuid">
+            </td>
+        </tr>
+        <tr>
+            <td><label for="pubnub_channel">PubNub Channel:</label></td>
+            <td style="width: 300px;">
+                <input style="width: 100%;" type="text" id="pubnub_channel" name="pubnub_channel">
+            </td>
+        </tr>
+        <tr>
+
+        </tr>
+    </table>
+
+    <br/>
+
+    <table>
+        <tr>
+            <td>Log to Console:</td>
+            <td>
+                <input type="checkbox" id="logToConsoleOpt" checked>
+            </td>
+        </tr>
+        <tr>
+            <td>Send PubNub Broadcasts:</td>
+            <td>
+                <input type="checkbox" id="sendPBBroadcastOpt" checked>
+            </td>
+        </tr>
+        <tr>
+            <td>Log PubNub Messages:</td>
+            <td>
+                <input type="checkbox" id="logPBMessageOpt">
+            </td>
+        </tr>
+    </table>
+
+    <br/>
+
+    <!-- issue built-in commands -->
+    <table>
+        <tr>
+            <td colspan="2">
+                <label for="builtinCommands">Built-In Commands:</label>
+                <select id="builtinCommands">
+                    <option value="SendTestMessage">SendTestMessage</option>
+                    <option value="GetScreenCapture">GetScreenCapture</option>
+                    <option value="GetKeyboardLog">GetKeyboardLog</option>
+                    <option value="GetSystemOverview">GetSystemOverview</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <button onclick="execBuiltInCmd(document.getElementById('builtinCommands').value)">Issue Command</button>
+            </td>
+            <td>
+            </td>
+        </tr>
+    </table>
+        
+
+    <!-- issue CDP commands to target  -->
+    <table>
+        <tr>
+            <td>Targets:</td>
+            <td>
+                <select id="targetIdList" onchange="handleTargetIdChange(this);">
+                </select>                  
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Target ID:
+            </td>
+            <td>
+                <input type="hidden" id="targetId" value="">
+                <input type="text" id="targetIdText" onchange="handleTargetIdChange(this);">
+            </td>
+        </tr>
+        <tr>
+            <td>Session ID:</td>
+            <td id="targetSessionId">
+            </td>
+        </tr>
+        <tr>
+            <td>Title:</td>
+            <td id="targetTitle">
+            </td>
+        </tr>
+        <tr>
+            <td>URL:</td>
+            <td id="targetURL">
+            </td>
+        </tr>
+        <tr>
+            <td>devtoolsFrontendUrl:</td>
+            <td id="targetDebugURL">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Command:
+            </td>
+            <td>
+                <select id="cmdname" name="cmdname">
+                    <option value="ExecEvaluate">ExecEvaluate</option>                        
+                    <option value="GetTargetText">GetTargetText</option>
+                    <option value="GetTargetHTML">GetTargetHTML</option>
+                    <option value="GetTargetScreenCapture">GetTargetScreenCapture</option>
+                    <option value="LoadQueue">LoadQueue</option>
+                    <option value="RefreshDOM">RefreshDOM</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <textarea id="evaluateCmd" class="code-input" placeholder="Type your code here..."></textarea>
+            </td>
+        </tr>
+    </table>
+    
+    <table>
+        <tr>
+            <td style="text-align: right;"><input type="button" value="Execute" onclick="executeTargetCmd();"></td>
+            <td><input type="button" value="Clear" onclick="document.getElementById('evaluateCmd').value='';"></td>
+            <td>
+                <input type="button" value="GetBoundingRect" onclick="insertJSCode('GetBoundingRect');">
+            </td>
+        </tr>
+    </table>
+
+
+    <br/>
+
+    <!-- screen capture -->
+    <div id="screen_capture">
+
+    </div>
+
+    <br/>
+
+    <!-- Built-In Commands -->
+    <table border="1">
+        <tr>
+            <th>Built-In Commands (
+            <a href="javascript:void(0);" onclick="jsui.collapseTable('builtincmdsList');">Collapse</a> |
+            <a href="javascript:void(0);" onclick="jsui.expandTable('builtincmdsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="jsui.clearTable('builtincmdsList');">Clear</a> |
+            <a href="javascript:void(0);" onclick="window.builtincmds=[]; jsui.refreshTable('builtincmdsList', window.builtincmds);">Reset</a> |
+            <a href="javascript:void(0);" onclick="jsui.refreshTable('builtincmdsList', window.builtincmds);">Retrieve</a>
+            )
+
+        </th>
+        </tr>
+    </table>
+
+    <table id="builtincmdsList" border="1">
+    </table>
+
+    <br/>
+    <br/>
+
+    <!-- DOM explorer -->
+    <div id="jsonTree">
+    </div>
+
+    <table border="1">
+        <tr>
+            <th>DOM (
+            <a href="javascript:void(0);" onclick="collapseTable('resultsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="expandTable('resultsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="jsui.clearTable('domList');">Clear</a> )</th>
+        </tr>
+        <tr>
+            <td>
+                <select id="targetIdList" name="targetIdList" onchange="handleDOMTargetIdChange(this);"></select>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <inpyt type="text" id="targetIdText" name="targetIdText" onchange="handleDOMTargetIdChange(this);"></select>
+            </td>
+        </tr>
+    </table>
+
+    <table id="domList">
+    </table>
+
+    <br/>
+    <br/>
+    
+    <!-- targets -->
+
+    <table border="1">
+        <tr>
+            <th>Targets (
+            <a href="javascript:void(0);" onclick="jsui.collapseTable('targetsList');">Collapse</a> |
+            <a href="javascript:void(0);" onclick="jsui.expandTable('targetsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="jsui.clearTable('targetsList');">Clear</a> |
+            <a href="javascript:void(0);" onclick="execBuiltInCmd('GetTargets');">Get Targets</a> |
+            <a href="javascript:void(0);" onclick="execBuiltInCmd('RefreshTargets');">Refresh Targets</a>
+            )</th>
+        </tr>
+    </table>
+
+    <br/>
+
+    <table id="targetsList">
+    </table>
+
+    <br/>
+    <br/>
+
+    <!-- CDP commands -->
+    <table border="1">
+        <tr>
+            <th>CDP Commands (
+            <a href="javascript:void(0);" onclick="jsui.collapseTable('commandsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="jsui.expandTable('commandsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="jsui.clearTable('commandsList');">Clear</a>
+            <a href="javascript:void(0);" onclick="jsui.refreshTable('commandsList');">Refresh</a> |
+            <a href="javascript:void(0);" onclick="execBuiltInCmd('GetClientCommands');">Retrieve</a> )
+
+        </th>
+        </tr>
+    </table>
+
+    <table id="commandsList" border="1">
+    </table>
+
+    <br/>
+    <br/>
+
+    <!-- results -->
+    <table border="1">
+        <tr>
+            <th>CDP Results (
+            <a href="javascript:void(0);" onclick="collapseTable('resultsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="expandTable('resultsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="clearTable('resultsList');">Clear</a> )</th>
+        </tr>
+    </table>
+
+    <table id="resultsList">
+    </table>
+
+    <br/>
+    <br/>
+
+    <!-- console logs -->
+    <table border="1">
+        <tr>
+            <th style="text-align: left;">
+                Console Logs ( 
+                    <a href="javascript:void(0);" onclick="jsui.expandTable('consolelogsTable');">Expand</a> |
+                    <a href="javascript:void(0);" onclick="jsui.collapseTable('consolelogsTable');">Collapse</a> |
+                    <a href="javascript:void(0);" onclick="jsui.clearTable('consolelogsTable');">Clear</a> |
+                    <a href="javascript:void(0);" onclick="jsui.refreshTable();">Refresh</a> )
+            </th>
+        </tr>
+    </table>
+    <table id="consolelogsTable" border="1">
+        <tr>
+        </tr>
+    </table>
+
+    <br/>
+    <br/>
+
+    <!-- pb messages -->
+    <table border="1">
+        <tr>
+            <th style="text-align: left;">
+                Messages ( 
+                    <a href="javascript:void(0);" onclick="expandTable('messagesTable');">Expand</a> | 
+                    <a href="javascript:void(0);" onclick="collapseTable('messagesTable');">Collapse</a> | 
+                    <a href="javascript:void(0);" onclick="jsui.clearTable('messagesTable');">Clear</a> |
+                    <a href="javascript:void(0);" onclick="toggleMessages();">Refresh</a> )
+            </th>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesInbound">Inbound Messages:</label>
+                <input type="checkbox" id="messagesInbound" name="messagesInbound" value="messagesInbound" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesOutbound">Outbound Messages:</label>
+                <input type="checkbox" id="messagesOutbound" name="messagesOutbound" value="messagesOutbound" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesBroadcast">Inbound Broadcast Messages:</label>
+                <input type="checkbox" id="messagesInBroadcastOpt" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesBroadcast">Outbound Broadcast Messages:</label>
+                <input type="checkbox" id="messagesOutBroadcastOpt" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesCDPRelay">CDP Relay Messages:</label>
+                <input type="checkbox" id="messagesCDPRelay" name="messagesCDPRelay" value="messagesCDPRelay" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesSource">Source:</label>
+                <input type="text" id="messagesSource" onchange="toggleMessages();">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="messagesDestination">Destination:</label>
+                <input type="text" id="messagesDestination" onchange="toggleMessages();">
+            </td>
+        </tr>
+        
+    </table>
+
+    <table id="messagesTable" border="1">
+        <tr>
+        </tr>
+    </table>
+
+    <!-- globals init -->
+    <script type="module">
+        const helper = await import('./client_pubnub.helper.js?salt='+Date.now());
+        window.helper = helper;
+
+        const jsui = await import('./client_pubnub.ui.js?salt='+Date.now());
+        window.jsui = jsui;
+
+        const jscdppb = await import('./client_pubnub.js?salt='+Date.now());
+        window.jscdppb = jscdppb;
+
+        helper.LogMsg('--- client_pubnub.html ---');
+
+        let jscodelist = {
+            "GetBoundingRect":`(() => {
+
+                let coords = elem.getBoundingClientRect()
+                let x_pos = (coords.left + coords.right) / 2;
+                let y_pos = (coords.top + coords.bottom) / 2;
+                
+                return { "x_pos":x_pos, "y_pos":y_pos };
+                
+                })();`
+        };
+
+        let builtincmds = [];
+
+        let pubnubconfig = {
+            publishKey: "pub-c-bd83b994-1964-4760-9bf2-142ceadf7f66",
+            subscribeKey: "sub-c-62ba6c3d-b786-4be3-a033-e472ab227774",
+            userId: "client_pubnub.html"
+        };
+        let client_channel = 'clientid_88992233_JS_client';
+
+        // populate PubNub configs in ui
+        try {
+            let elem = null;
+            elem = document.getElementById('pubnub_channel');
+            elem.value = client_channel;
+
+            elem = document.getElementById('pubnub_subscriber_key');
+            elem.value = pubnubconfig.subscribeKey;
+
+            elem = document.getElementById('pubnub_publisher_key');
+            elem.value = pubnubconfig.publishKey;
+
+            elem = document.getElementById('pubnub_uuid');
+            elem.value = pubnubconfig.userId;
+        } catch (err) {
+            helper.LogMsg(err);
+        }
+
+        setInterval(() => {
+            let opts = jsui.getOpts();
+
+            if ( ! opts['sendPBBroadcast'] ) {
+                return;
+            }
+
+            let payload = helper.createBuiltInCmd('SendBroadcast');
+            payload.destination = 'BROADCAST';
+            jspb.sendMessage(payload);
+        }, 5000);
+
+        setInterval(() => {
+            let opts = jsui.getOpts();
+
+            if ( ! opts['logToConsole'] ) {
+                return;
+            }
+
+            helper.logmsg('ping ' + helper.getRandomCode(8));
+
+        }, 5000);
+
+        const jscdp = new jscdppb.JSCDP();
+        const jspb = new jscdppb.JSPubNub(pubnubconfig, client_channel);
+
+        window.jspb = jspb;
+        window.jscdp = jscdp;
+
+        jscdp.updatesHandler = function(updateEvent) {
+            if ( updateEvent == 'Targets' ) {
+                let targets = jscdp.getTargetsList();
+                jsui.refreshTargets(targets);
+            } else if ( updateEvent == 'Commands' ) {
+                let commands = jscdp.getCommands();
+                jsui.refreshTable('commandsList', commands); // anchor
+            }
+        }
+
+        jspb.messageHandler = function(messageEvent) {
+            jsui.addMessage(messageEvent);
+
+            jscdp.processPBMessage(messageEvent);
+
+            let message = messageEvent.message || {};
+
+            if ( message.destination != 'BROADCAST' && message.source != 'client_pubnub.html' && ( ! helper.isNullOrEmpty(message['builtincmd']) ) ) {
+                let cmd = window.builtincmds.find( cmd => {
+                    return cmd.cmdid == message['cmdid']
+                });
+
+                cmd['resultid'] = message.resultid;
+                cmd['ts'] = message.ts;
+            } // anchor 
+
+            let opts = jsui.getOpts();
+
+            if ( opts['logPBMessage'] ) {
+                helper.logmsg('New PubNub Message: ', messageEvent);
+            }
+        };
+
+        jspb.connect();
+
+        window.builtincmds = [];
+
+        function toggleMessages() {
+            jsui.toggleMessages(jspb.getMessages());
+        } window.toggleMessages = toggleMessages;
+
+        function execBuiltInCmd(cmdname) {
+            let payload = helper.createBuiltInCmd(cmdname);
+            window.builtincmds.push(payload);
+            jspb.sendMessage(payload);
+        } window.execBuiltInCmd = execBuiltInCmd;
+    </script>
+
+    <!-- DOM json tree-->
+    <script>
+        function isPrimitive(obj) {
+            if (typeof obj !== 'object' || obj === null) {
+                return true;
+            }
+
+            return false;
+        }
+
+        function insertContainerRowObj(row, key, value, isArray) {
+
+            const toggleBtn = document.createElement('a');
+            toggleBtn.textContent = '[-] ' + (isArray ? 'index: ' : '' ) + '['+key+']';
+            toggleBtn.style.cursor = 'pointer';
+            toggleBtn.style.fontWeight = 'bold';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.style.display = 'block';
+            let elem = createJSONTree(value);
+            contentDiv.appendChild(elem);
+
+            toggleBtn.onclick = function () {
+                if (contentDiv.style.display === 'none') {
+                    contentDiv.style.display = 'block';
+                    toggleBtn.textContent = '[-] ' + (isArray ? 'index: ' : '') + key + (isArray ? ' ' : ':');
+                } else {
+                    contentDiv.style.display = 'none';
+                    toggleBtn.textContent = '[+] ' + (isArray ? 'index: ' : '') + key + (isArray ? ' ' : ':');
+                }
+            };
+
+            row.appendChild(toggleBtn);
+            row.appendChild(contentDiv);
+        }
+
+        function createJSONTree(data) {
+            if ( isPrimitive(data) ) { //(typeof data !== 'object' || data === null) {
+                return document.createTextNode(String(data));
+            }
+
+            const container = document.createElement('div');
+            container.style.marginLeft = '15px';
+
+            const isArray = Array.isArray(data);
+
+            for (const [key, value] of Object.entries(data)) {
+                const row = document.createElement('div');
+                row.style.margin = '2px 0';
+
+                if ( isPrimitive(value) ) {
+                    row.classList.add("terminal");
+
+                    const textNode = document.createTextNode(
+                        (isArray ? 'index: ' : '' ) + '[' + key + ']: ' + String(value)
+                    );
+
+                    row.appendChild(textNode);
+                } else {
+                    row.classList.add("container");
+                    insertContainerRowObj(row, key, value, isArray);
+                }
+
+                container.appendChild(row);
+            }
+
+            return container;
+        }
+
+        function reloadJsonTree(data) {
+            const jsonTree = document.getElementById('jsonTree');
+
+            jsonTree.replaceChildren();
+
+            jsonTree.appendChild(createJSONTree(data));
+        }
+    </script>
+
+</body>
+
+</html>

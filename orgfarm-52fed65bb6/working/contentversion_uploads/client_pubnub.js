@@ -159,6 +159,13 @@ export class JSCDP {
     screencapture_chunks = null;
     targets = [];
 
+    commands = [];
+    results = [];
+    errors = [];
+    responses = [];
+    consolecalls = [];
+    browserversion = null;
+
     constructor() {
         this.sendQueue = [];
 
@@ -181,8 +188,17 @@ export class JSCDP {
         return this.targets;
     }
 
+    getCommands() {
+        return this.commands;
+    }
+
+    setCommands(commands) {
+        this.commands = commands;
+
+        this.updatesHandler('Commands');
+    }
+
     setTargetsList(stargets) {
-        // TODO convert to array of JSCDPTarget objects
         this.targets = stargets;
 
         this.updatesHandler('Targets');
@@ -279,8 +295,21 @@ export class JSCDP {
         // TODO implement -- show text in ui
     }
 
-    process_GetClientCommands(result) {
-        refreshCommandsTable(result);
+    process_GetClientCommands(message) {
+        let result = message.result;
+
+        try {
+            if ( result ) {
+                result = atob(result);
+            }
+
+            result = JSON.parse(result);
+        } catch (e) {
+
+        }
+        
+        this.setCommands(result);
+
     }
 
     process_GetTargetHTML(result, message) {
@@ -329,7 +358,6 @@ export class JSCDP {
         let targets = result;
 
         this.setTargetsList(targets);
-
     }
 
     process_ExecEvaluate(result, message) {

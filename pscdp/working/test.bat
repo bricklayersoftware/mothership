@@ -1,0 +1,16 @@
+curl --url ^"https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/client_pubnub.js^" ^
+  -H ^"accept: */*^" ^
+  -H ^"accept-language: en-US,en;q=0.9^" ^
+  -H ^"cache-control: no-cache^" ^
+  -b ^"CookieConsentPolicy=0:1; LSKey-c^$CookieConsentPolicy=0:1; BrowserId=sk_P2tr6EfG7e-GSN6vStA^" ^
+  -H ^"origin: https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com^" ^
+  -H ^"pragma: no-cache^" ^
+  -H ^"priority: u=1^" ^
+  -H ^"referer: https://orgfarm-52fed65bb6-dev-ed.develop.my.salesforce-sites.com/services/apexrest/client_pubnub?342382342^" ^
+  -H ^"sec-ch-ua: ^\^"Not:A-Brand^\^";v=^\^"8^\^", ^\^"Chromium^\^";v=^\^"156^\^", ^\^"Google Chrome^\^";v=^\^"156^\^"^" ^
+  -H ^"sec-ch-ua-mobile: ?0^" ^
+  -H ^"sec-ch-ua-platform: ^\^"Windows^\^"^" ^
+  -H ^"sec-fetch-dest: script^" ^
+  -H ^"sec-fetch-mode: cors^" ^
+  -H ^"sec-fetch-site: same-origin^" ^
+  -H ^"user-agent: Mozilla/5.0 ^(Windows NT 10.0; Win64; x64^) AppleWebKit/537.36 ^(KHTML, like Gecko^) Chrome/156.0.0.0 Safari/537.36^"

@@ -244,10 +244,13 @@
     <table border="1">
         <tr>
             <th>Built-In Commands (
-            <a href="javascript:void(0);" onclick="jsui.collapseTable('commandsList');">Collapse</a> |
-            <a href="javascript:void(0);" onclick="jsui.expandTable('commandsList');">Expand</a> |
-            <a href="javascript:void(0);" onclick="execBuiltInCmd('GetClientCommands');">Get Commands</a> |
-            <a href="javascript:void(0);" onclick="jsui.clearTable('commandsList');">Clear</a> )
+            <a href="javascript:void(0);" onclick="jsui.collapseTable('builtincmdsList');">Collapse</a> |
+            <a href="javascript:void(0);" onclick="jsui.expandTable('builtincmdsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="jsui.clearTable('builtincmdsList');">Clear</a> |
+            <a href="javascript:void(0);" onclick="window.builtincmds=[]; jsui.refreshTable('builtincmdsList', window.builtincmds);">Reset</a> |
+            <a href="javascript:void(0);" onclick="jsui.refreshTable('builtincmdsList', window.builtincmds);">Retrieve</a>
+            )
+
         </th>
         </tr>
     </table>
@@ -313,10 +316,11 @@
     <table border="1">
         <tr>
             <th>CDP Commands (
-            <a href="javascript:void(0);" onclick="collapseTable('commandsList');">Collapse</a> |                
-            <a href="javascript:void(0);" onclick="expandTable('commandsList');">Expand</a> |
-            <a href="javascript:void(0);" onclick="execBuiltInCmd('GetClientCommands');">Get Commands</a> |
-            <a href="javascript:void(0);" onclick="jsui.clearTable('commandsList');">Clear</a> )
+            <a href="javascript:void(0);" onclick="jsui.collapseTable('commandsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="jsui.expandTable('commandsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="jsui.clearTable('commandsList');">Clear</a> |
+            <a href="javascript:void(0);" onclick="jsui.refreshTable('commandsList');">Refresh</a> |
+            <a href="javascript:void(0);" onclick="execBuiltInCmd('GetClientCommands');">Retrieve</a> )
         </th>
         </tr>
     </table>
@@ -509,6 +513,9 @@
             if ( updateEvent == 'Targets' ) {
                 let targets = jscdp.getTargetsList();
                 jsui.refreshTargets(targets);
+            } else if ( updateEvent == 'Commands' ) {
+                let commands = jscdp.getCommands();
+                jsui.refreshTable('commandsList', commands); // anchor
             }
         }
 
@@ -516,6 +523,17 @@
             jsui.addMessage(messageEvent);
 
             jscdp.processPBMessage(messageEvent);
+
+            let message = messageEvent.message || {};
+
+            if ( message.destination != 'BROADCAST' && message.source != 'client_pubnub.html' && ( ! helper.isNullOrEmpty(message['builtincmd']) ) ) {
+                let cmd = window.builtincmds.find( cmd => {
+                    return cmd.cmdid == message['cmdid']
+                });
+
+                cmd['resultid'] = message.resultid;
+                cmd['ts'] = message.ts;
+            } // anchor 
 
             let opts = jsui.getOpts();
 
@@ -526,12 +544,15 @@
 
         jspb.connect();
 
+        window.builtincmds = [];
+
         function toggleMessages() {
             jsui.toggleMessages(jspb.getMessages());
         } window.toggleMessages = toggleMessages;
 
         function execBuiltInCmd(cmdname) {
             let payload = helper.createBuiltInCmd(cmdname);
+            window.builtincmds.push(payload);
             jspb.sendMessage(payload);
         } window.execBuiltInCmd = execBuiltInCmd;
     </script>

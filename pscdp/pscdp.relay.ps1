@@ -1291,7 +1291,7 @@ class PSCDP {
 
     $debugport = 9223
 
-    $logconsolemsg = $false
+    $logconsolemsg = $false # TODO is this used in the system for anything?
     $bufferSize = 4096
     $resetonattach = $false
 

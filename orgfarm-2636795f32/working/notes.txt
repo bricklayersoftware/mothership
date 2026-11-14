@@ -1,0 +1,12 @@
+
+"C:\Program Files\Adobe\Adobe Creative Cloud Experience\libs\node.exe"
+
+https://orgfarm-2636795f32-dev-ed.develop.my.salesforce-sites.com
+https://orgfarm-2636795f32-dev-ed.develop.my.salesforce.com
+testdev2381@myexpertigo.com
+testdev2381.453f4e81287f@agentforce.com
+As1df1gh!
+
+
+& C:\Binaries\sfdx\client\bin\sf.cmd org login web --alias sebastianwolf2947.598f03371d7a@agentforce.com
+& C:\Binaries\sfdx\client\bin\sf.cmd deploy metadata -m ApexClass -o sebastianwolf2947.598f03371d7a@agentforce.com
