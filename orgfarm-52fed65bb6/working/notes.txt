@@ -27,3 +27,10 @@ curl -v -X POST --data-binary "@customers-100.csv" <tplmothership>/ow/upload.php
 curl -v -T customers-100.csv <tplmothership>/ow/upload.php?filename=cust.csv
 
 set PATH=%PATH%;C:\Binaries\sfdx\client\bin
+
+
+https://orgfarm-2636795f32-dev-ed.develop.my.salesforce-sites.com
+https://orgfarm-2636795f32-dev-ed.develop.my.salesforce.com
+testdev2381@myexpertigo.com
+testdev2381.453f4e81287f@agentforce.com
+As1df1gh!
