@@ -355,7 +355,8 @@
                     <a href="javascript:void(0);" onclick="jsui.expandTable('consolelogsTable');">Expand</a> |
                     <a href="javascript:void(0);" onclick="jsui.collapseTable('consolelogsTable');">Collapse</a> |
                     <a href="javascript:void(0);" onclick="jsui.clearTable('consolelogsTable');">Clear</a> |
-                    <a href="javascript:void(0);" onclick="jsui.refreshTable();">Refresh</a> )
+                    <a href="javascript:void(0);" onclick="resetTable('consolelogsTable');">Reset</a>  |
+                    <a href="javascript:void(0);" onclick="jsui.refreshTable('consolelogsTable');">Retrieve</a> ) <!-- anchor -->
             </th>
         </tr>
     </table>
@@ -555,6 +556,14 @@
             window.builtincmds.push(payload);
             jspb.sendMessage(payload);
         } window.execBuiltInCmd = execBuiltInCmd;
+
+        var tableMapper = {
+
+        };
+
+        function resetTable(tablename) {
+
+        }
     </script>
 
     <!-- DOM json tree-->

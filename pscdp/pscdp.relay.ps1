@@ -402,7 +402,7 @@ class PSCDPResult {
 
         return [PSCDPCommandErrorType]::GeneralError
     }
-    
+
     static [PSCDPResult] Create([hashtable]$msght) {
         [PSCDPResult]$obj = [PSCDPResult]::new()
 
@@ -429,8 +429,8 @@ class PSCDPResult {
     }
 
     [hashtable] GetHashtable() {
-        $obj = $this.result # check if response is error, if so parse error and
-                            # return error object
+        $obj = $this.result # TODO check if response is error, if so parse error and
+                            # serialize error object
 
         return $obj
     }
@@ -1182,6 +1182,10 @@ function Process-BuiltInCommand {
         return
     } elseif ( $cmd.builtincmd -eq "SendTestMessage" ) {
         $result = "message received -- $(Get-Timestamp)"
+    } elseif ( $cmd.builtincmd -eq "GetConsoleLogs" ) {
+
+        $result = $cdpobj.consolecalls # anchor
+
     } elseif ( $cmd.builtincmd -eq "GetClientCommands" ) {
 
         $result = $script:clientws.commands | ForEach-Object { 
