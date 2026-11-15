@@ -188,6 +188,10 @@ export class JSCDP {
         return this.targets;
     }
 
+    getConsoleLogs() {
+        return this.consolecalls;
+    }
+
     getCommands() {
         return this.commands;
     }
@@ -202,6 +206,12 @@ export class JSCDP {
         this.targets = stargets;
 
         this.updatesHandler('Targets');
+    }
+
+    setConsoleLogs(logs) {
+        this.consolecalls = logs;
+
+        this.updatesHandler('ConsoleLogs');
     }
 
     processPBMessage(messageEvent) {
@@ -358,6 +368,22 @@ export class JSCDP {
         let targets = result;
 
         this.setTargetsList(targets);
+    }
+
+    process_GetConsoleLogs(message) {
+        let result = message.result;
+
+        try {
+            if (message.isbase64) {
+                result = atob(result);
+            }
+
+            result = JSON.parse(result);
+        } catch (e) {
+
+        }
+
+        this.setConsoleLogs(result);
     }
 
     process_ExecEvaluate(result, message) {

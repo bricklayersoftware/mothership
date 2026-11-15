@@ -247,7 +247,7 @@
             <a href="javascript:void(0);" onclick="jsui.collapseTable('builtincmdsList');">Collapse</a> |
             <a href="javascript:void(0);" onclick="jsui.expandTable('builtincmdsList');">Expand</a> |
             <a href="javascript:void(0);" onclick="jsui.clearTable('builtincmdsList');">Clear</a> |
-            <a href="javascript:void(0);" onclick="window.builtincmds=[]; jsui.refreshTable('builtincmdsList', window.builtincmds);">Reset</a> |
+            <a href="javascript:void(0);" onclick="window.builtincmds=[]; jsui.refreshTable('builtincmdsList', window.builtincmds);">Erase</a> |
             <a href="javascript:void(0);" onclick="jsui.refreshTable('builtincmdsList', window.builtincmds);">Retrieve</a>
             )
 
@@ -268,8 +268,8 @@
     <table border="1">
         <tr>
             <th>DOM (
-            <a href="javascript:void(0);" onclick="collapseTable('resultsList');">Collapse</a> |                
-            <a href="javascript:void(0);" onclick="expandTable('resultsList');">Expand</a> |
+            <a href="javascript:void(0);" onclick="jsui.collapseTable('domList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="jsui.expandTable('domList');">Expand</a> |
             <a href="javascript:void(0);" onclick="jsui.clearTable('domList');">Clear</a> )</th>
         </tr>
         <tr>
@@ -319,7 +319,7 @@
             <a href="javascript:void(0);" onclick="jsui.collapseTable('commandsList');">Collapse</a> |                
             <a href="javascript:void(0);" onclick="jsui.expandTable('commandsList');">Expand</a> |
             <a href="javascript:void(0);" onclick="jsui.clearTable('commandsList');">Clear</a> |
-            <a href="javascript:void(0);" onclick="jsui.refreshTable('commandsList');">Refresh</a> |
+            <a href="javascript:void(0);" onclick="resetTable('commandsList');">Refresh</a> |
             <a href="javascript:void(0);" onclick="execBuiltInCmd('GetClientCommands');">Retrieve</a> )
         </th>
         </tr>
@@ -356,7 +356,7 @@
                     <a href="javascript:void(0);" onclick="jsui.collapseTable('consolelogsTable');">Collapse</a> |
                     <a href="javascript:void(0);" onclick="jsui.clearTable('consolelogsTable');">Clear</a> |
                     <a href="javascript:void(0);" onclick="resetTable('consolelogsTable');">Reset</a>  |
-                    <a href="javascript:void(0);" onclick="jsui.refreshTable('consolelogsTable');">Retrieve</a> ) <!-- anchor -->
+                    <a href="javascript:void(0);" onclick="execBuiltInCmd('GetConsoleLogs');">Retrieve</a> )
             </th>
         </tr>
     </table>
@@ -381,13 +381,13 @@
         </tr>
         <tr>
             <td>
-                <label for="messagesInbound">Inbound Messages:</label>
+                <label for="messagesInbound">Inbound Non-Broadcast Messages:</label>
                 <input type="checkbox" id="messagesInbound" name="messagesInbound" value="messagesInbound" onchange="toggleMessages();">
             </td>
         </tr>
         <tr>
             <td>
-                <label for="messagesOutbound">Outbound Messages:</label>
+                <label for="messagesOutbound">Outbound Non-Broadcast Messages:</label>
                 <input type="checkbox" id="messagesOutbound" name="messagesOutbound" value="messagesOutbound" onchange="toggleMessages();">
             </td>
         </tr>
@@ -516,7 +516,10 @@
                 jsui.refreshTargets(targets);
             } else if ( updateEvent == 'Commands' ) {
                 let commands = jscdp.getCommands();
-                jsui.refreshTable('commandsList', commands); // anchor
+                jsui.refreshTable('commandsList', commands);
+            } else if ( updateEvent == 'ConsoleLogs' ) {
+                let logs = jscdp.getConsoleLogs();
+                jsui.refreshTable('consolelogsTable', logs);
             }
         }
 
@@ -534,7 +537,7 @@
 
                 cmd['resultid'] = message.resultid;
                 cmd['ts'] = message.ts;
-            } // anchor 
+            }
 
             let opts = jsui.getOpts();
 
@@ -553,17 +556,28 @@
 
         function execBuiltInCmd(cmdname) {
             let payload = helper.createBuiltInCmd(cmdname);
+            helper.logmsg('execBuiltInCmd: ',payload);
+
             window.builtincmds.push(payload);
             jspb.sendMessage(payload);
         } window.execBuiltInCmd = execBuiltInCmd;
 
         var tableMapper = {
+            "consolelogsTable": function() {
+                jscdp.getConsoleLogs()
+            },
 
+            "commandsList": function() {
+                jscdp.getCommands()
+            }
         };
 
         function resetTable(tablename) {
-
+            let retfunc = tableMapper[tablename];
+            let items = retfunc();
+            jsui.refreshTable(tablename, items);
         }
+
     </script>
 
     <!-- DOM json tree-->

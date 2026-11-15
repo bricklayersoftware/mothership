@@ -429,8 +429,16 @@ class PSCDPResult {
     }
 
     [hashtable] GetHashtable() {
-        $obj = $this.result # TODO check if response is error, if so parse error and
-                            # serialize error object
+        $obj = @{}
+        
+        $obj['result']= $this.result
+        $obj['resultid'] = $this.id
+        $obj['iserror'] = $this.iserror
+        $obj['errortype'] = $null
+        
+        if ( $this.iserror ) {
+            $obj['errortype'] = $this.errorType.ToString()
+        }
 
         return $obj
     }
@@ -1184,7 +1192,15 @@ function Process-BuiltInCommand {
         $result = "message received -- $(Get-Timestamp)"
     } elseif ( $cmd.builtincmd -eq "GetConsoleLogs" ) {
 
-        $result = $cdpobj.consolecalls # anchor
+        if ( $null -eq $cdpobj.consolecalls -or $cdpobj.consolecalls.Count -eq 0 ) {
+            $result = @{}
+        } else {
+
+            $result = $cdpobj.consolecalls | ForEach-Object { 
+                $_.GetHashtable()
+            }
+
+        }
 
     } elseif ( $cmd.builtincmd -eq "GetClientCommands" ) {
 
@@ -1834,7 +1850,6 @@ class PSCDP {
                     } | ForEach-Object { $_.sessionId = $sessionId }
                 }
 
-                # anchor
                 if ( ! $targetInfo.enable_init ) {
                     # $this.LoadQueue($targetInfo)
                 }
