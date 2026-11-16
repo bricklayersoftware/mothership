@@ -165,7 +165,7 @@
         <tr>
             <td>Targets:</td>
             <td>
-                <select id="targetIdList" onchange="handleTargetIdChange(this);">
+                <select id="targetIdList" onchange="jsui.handleTargetIdChange(this);">
                 </select>                  
             </td>
         </tr>
@@ -175,7 +175,7 @@
             </td>
             <td>
                 <input type="hidden" id="targetId" value="">
-                <input type="text" id="targetIdText" onchange="handleTargetIdChange(this);">
+                <input type="text" id="targetIdText" onchange="jsui.handleTargetIdChange(this);">
             </td>
         </tr>
         <tr>
@@ -222,7 +222,7 @@
     
     <table>
         <tr>
-            <td style="text-align: right;"><input type="button" value="Execute" onclick="executeTargetCmd();"></td>
+            <td style="text-align: right;"><input type="button" value="Execute" onclick="executeTargetCmd(document.getElementById('cmdname').value);"></td>
             <td><input type="button" value="Clear" onclick="document.getElementById('evaluateCmd').value='';"></td>
             <td>
                 <input type="button" value="GetBoundingRect" onclick="insertJSCode('GetBoundingRect');">
@@ -248,9 +248,7 @@
             <a href="javascript:void(0);" onclick="jsui.expandTable('builtincmdsList');">Expand</a> |
             <a href="javascript:void(0);" onclick="jsui.clearTable('builtincmdsList');">Clear</a> |
             <a href="javascript:void(0);" onclick="window.builtincmds=[]; jsui.refreshTable('builtincmdsList', window.builtincmds);">Erase</a> |
-            <a href="javascript:void(0);" onclick="jsui.refreshTable('builtincmdsList', window.builtincmds);">Retrieve</a>
-            )
-
+            <a href="javascript:void(0);" onclick="jsui.refreshTable('builtincmdsList', window.builtincmds);">Retrieve</a> )
         </th>
         </tr>
     </table>
@@ -298,6 +296,7 @@
             <a href="javascript:void(0);" onclick="jsui.collapseTable('targetsList');">Collapse</a> |
             <a href="javascript:void(0);" onclick="jsui.expandTable('targetsList');">Expand</a> |
             <a href="javascript:void(0);" onclick="jsui.clearTable('targetsList');">Clear</a> |
+            <a href="javascript:void(0);" onclick="resetTable('targetsList');">Reset</a> | <!-- anchor -->
             <a href="javascript:void(0);" onclick="execBuiltInCmd('GetTargets');">Get Targets</a> |
             <a href="javascript:void(0);" onclick="execBuiltInCmd('RefreshTargets');">Refresh Targets</a>
             )</th>
@@ -562,13 +561,27 @@
             jspb.sendMessage(payload);
         } window.execBuiltInCmd = execBuiltInCmd;
 
+        function executeTargetCmd(cmdname) {
+            let payload = helper.createBuiltInCmd(cmdname);
+            payload['targetid'] = document.getElementById('targetId').value;
+
+            helper.logmsg('executeTargetCmd: ',payload);
+
+            window.builtincmds.push(payload);
+            jspb.sendMessage(payload);
+        } window.executeTargetCmd  = executeTargetCmd;
+
         var tableMapper = {
             "consolelogsTable": function() {
-                jscdp.getConsoleLogs()
+                return jscdp.getConsoleLogs()
             },
 
             "commandsList": function() {
-                jscdp.getCommands()
+                return jscdp.getCommands()
+            },
+
+            "targetsList": function() {
+                return jscdp.getTargetsList()
             }
         };
 
@@ -576,7 +589,7 @@
             let retfunc = tableMapper[tablename];
             let items = retfunc();
             jsui.refreshTable(tablename, items);
-        }
+        } window.resetTable = resetTable;
 
     </script>
 

@@ -561,15 +561,27 @@ $script:browserversion_callback = {
 
 $script:runtime_enable_callback = {
     param(
-        [object]$Response, [PSCDP]$cdpobj
+        [PSCDPResult]$Response, [PSCDP]$cdpobj
     )
 
-    $target = $Response.cmd.target
+    if ( $Response.iserror ) {
+        return
+    }
+
+    $cmd = $Response.cmd
+
+    $target = $cmd.target
 
     $target = $cdpobj.GetTarget($target.targetId)
 
-    if ( ! $null -eq $target ) {
+    if ( $null -eq $target ) {
+        return
+    }
+
+    # anchor
+    if ( $cmd.method -eq 'Runtime.enable' ) {
         $target.runtime_enable_ok = $true
+    } elseif ( $cmd.method -eq 'Runtime.enable' ) {
     }
 }
 
@@ -1063,6 +1075,8 @@ function Send-ChunkedResult {
 
 function Process-BuiltInCommand {
     param([hashtable]$cmd, [PSCDP]$cdpobj)
+
+    $script:clientws = $cdpobj
 
     $resultout = @{
         builtincmd=$cmd.builtincmd
@@ -1953,9 +1967,9 @@ class PSCDP {
 
         $target.enable_init = $true
 
-        $this.AddQueue( @{ method="Page.enable"; params=@{ enabled = $true }; target=$target } )
-        $this.AddQueue( @{ method="Page.setLifecycleEventsEnabled"; params=@{ enabled = $true }; target=$target } )
-        $this.AddQueue( @{ method="DOM.enable"; params=@{ enabled = $true }; target=$target } )
+        $this.AddQueue( @{ method="Page.enable"; params=@{ enabled = $true }; target=$target; callback=$script:runtime_enable_callback } )
+        $this.AddQueue( @{ method="Page.setLifecycleEventsEnabled"; params=@{ enabled = $true }; target=$target; callback=$script:runtime_enable_callback } )
+        $this.AddQueue( @{ method="DOM.enable"; params=@{ enabled = $true }; target=$target; callback=$script:runtime_enable_callback } )
         $this.AddQueue( @{ method="Runtime.enable"; params=@{ enabled = $true }; target=$target; callback=$script:runtime_enable_callback } )
 
         # $this.sendQueue.Add( @{ method="Overlay.enable"; params=@{ enabled = $true } } )
@@ -2317,6 +2331,8 @@ $script:pb = [PubNub]::new()
 $script:pb.Init()
 $script:pb.EventHandler = {
     param([hashtable]$pbmsg)
+
+    $script:clientws = $script:clientit['cdpobj']
 
     Process-PubNubEvent -Message $pbmsg -cdpobj $script:clientws
 }

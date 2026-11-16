@@ -165,7 +165,8 @@ export class JSCDP {
     responses = [];
     consolecalls = [];
     browserversion = null;
-
+    targets = [];
+    
     constructor() {
         this.sendQueue = [];
 
