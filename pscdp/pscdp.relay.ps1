@@ -484,6 +484,9 @@ class PSCDPTarget {
     $addbinding_ok = $false             # Runtime.addBinding
     $runtime_enable_ok = $false         # Runtime.enable
     $emulation_enable_ok = $false       # Emulation.setFocusEmulationEnabled
+    $page_enable_ok = $false
+    $page_setLifecycleEventsEnabled_ok = $false
+    $dom_enable_ok = $false
 
     $commands = [System.Collections.Generic.List[PSCDPCommand]]::new()
     $consolecalls = [System.Collections.Generic.List[PSCDPResult]]::new()
@@ -578,10 +581,14 @@ $script:runtime_enable_callback = {
         return
     }
 
-    # anchor
-    if ( $cmd.method -eq 'Runtime.enable' ) {
-        $target.runtime_enable_ok = $true
+    if ( $cmd.method -eq 'Page.enable' ) {
+        $target.page_enable_ok = $true
+    } elseif ( $cmd.method -eq 'Page.setLifecycleEventsEnabled' ) {
+        $target.page_setLifecycleEventsEnabled_ok = $true
+    } elseif ( $cmd.method -eq 'DOM.enable' ) {
+        $target.dom_enable_ok = $true
     } elseif ( $cmd.method -eq 'Runtime.enable' ) {
+        $target.runtime_enable_ok = $true
     }
 }
 
