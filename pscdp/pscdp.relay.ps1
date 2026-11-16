@@ -506,9 +506,16 @@ class PSCDPTarget {
             browserContextId=$this.browserContextId
             sessionId=$this.sessionId
             executionContextId=$this.executionContextId
+            addbinding_ts=$this.addbinding_ts
+            addbinding_ts_ok=$this.addbinding_ts_ok
+            enable_init = $this.enable_init
             runtime_enable_ok=$this.runtime_enable_ok
             addbinding_ok=$this.addbinding_ok
             emulation_enable_ok=$this.emulation_enable_ok
+            page_enable_ok=$this.page_enable_ok
+            page_setLifecycleEventsEnabled_ok=$this.page_setLifecycleEventsEnabled_ok
+            dom_enable_ok=$this.dom_enable_ok
+
         }
 
         return $ht
