@@ -852,6 +852,80 @@ $script:getdom_callback = {
     $script:pb.SendMessage($resultout)
 }
 
+function GetChunks {
+    param([hashtable]$tresultout, [string]$imagedata, [int32]$chunkSize = 512)
+
+    if ( $null -eq $tresultout ) {
+        return $null
+    }
+
+    if ( [string]::IsNullOrEmpty($imagedata) ) {
+        return $null
+    }
+
+    $imagelength = $imagedata.length
+
+    $messages = [System.Collections.Generic.List[hashtable]]::new()
+
+    if ( $imagelength -le $chunkSize ) {
+        $resultout = $tresultout.Clone()
+        
+        $resultout['ts']=$(Get-Timestamp)
+        $resultout['ischunked'] = $true
+        $resultout['result'] = @{ imagedata=$imagedata }
+        $resultout['chunkcount'] = $chunkcount
+        $resultout['chunksize'] = $chunksize
+        $resultout['chunkindex'] = $i
+        $resultout['remainderlength'] = $remainderlength
+
+        $messages.Add($resultout)
+
+        return $messages
+    }   
+
+    $chunks = [System.Collections.Generic.List[string]]::new()
+
+    $chunkcount = [int] ( $imagelength / $chunkSize )
+    $remainderlength = $imagelength % $chunkSize
+
+    $tchunkcount = $chunkcount
+
+    if ( $remainderlength -gt 0 ) {
+        $tchunkcount = $chunkcount - 1
+    }
+
+    for ($i = 0; $i -lt $tchunkcount; $i++ ) {
+        $substr = ""
+        $substr = $imagedata.Substring( $i*$chunkSize, $chunkSize )
+        $chunks.Add( $substr )
+    }
+
+    if ( $remainderlength -gt 0 ) {
+        $chunks.Add( $imagedata.Substring( ($chunkcount-1)*$chunkSize ) )
+    }
+
+    if ( $chunks.Count -ne $chunkcount ) {
+        Log-Msg "pass"
+    }
+
+    for ($i = 0; $i -lt $chunks.Count; $i++ ) {
+
+        $resultout = $tresultout.Clone()
+
+        $resultout['ts'] = $( Get-Timestamp )
+        $resultout['result'] = @{ imagedata=$chunks[$i] }
+        $resultout['ischunked'] = $true
+        $resultout['chunkcount'] = $chunkcount
+        $resultout['chunksize'] = $chunksize
+        $resultout['chunkindex'] = $i
+        $resultout['remainderlength'] = $remainderlength
+        
+        $messages.Add($resultout)
+    }
+
+    return $messages
+}
+
 function ProcessDOMObj {
     param([PSCustomObject]$obj)
 
@@ -1090,7 +1164,7 @@ function Send-ChunkedResult {
 function Process-BuiltInCommand {
     param([hashtable]$cmd, [PSCDP]$cdpobj)
 
-    $script:clientws = $cdpobj
+    $script:clientws = $cdpobj # TODO get rid of $script:clientws just use cdpobj
 
     $resultout = @{
         builtincmd=$cmd.builtincmd
@@ -1127,7 +1201,7 @@ function Process-BuiltInCommand {
         $result = $errors
 
     } elseif ( $cmd.builtincmd -eq "GetTargets" ) {
-        $targets = $script:clientws.targets
+        $targets = $cdpobj.targets
 
         $ttargets = $targets | ForEach-Object { $_.GetDict() }
 
@@ -1297,9 +1371,25 @@ function Process-BuiltInCommand {
     $tbytes = [System.Text.Encoding]::UTF8.GetBytes($json)
     $jsonb = [System.Convert]::ToBase64String($tbytes)
 
-    $resultout['result'] = $jsonb
+    if ( [string]::IsNullOrEmpty($jsonb) ) {
+        throw 'not able to generate result image'
+    }
 
-    $script:pb.SendMessage($resultout)
+    $chunkSize = 512
+    if ( $jsonb.length -ge $chunkSize ) {
+        $messages = GetChunks $resultout $jsonb $chunkSize
+    } else {
+        $resultout['result'] = $jsonb
+        $resultout['ischunked'] = $false
+        $script:pb.SendMessage($resultout)
+
+        return
+    }
+
+    $messages | ForEach-Object {
+        $script:pb.SendMessage($_)
+    }
+
 }
 
 # NOTE only supports pb messages with builtincmd payload
