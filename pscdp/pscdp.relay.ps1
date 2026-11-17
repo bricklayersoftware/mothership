@@ -1117,6 +1117,15 @@ function Process-BuiltInCommand {
 
     } elseif ( $cmd.builtincmd -eq "ExecCDPCommand" ) {
         $result = Exec-CDP($cmd)
+    } elseif ( $cmd.builtincmd -eq "GetCDPErrors" ) {
+        $errors = $script:clientws.errors
+
+        if ( $null -eq $errors -or $errors.Count -eq 0 ) {
+            $errors = @{}
+        }
+
+        $result = $errors
+
     } elseif ( $cmd.builtincmd -eq "GetTargets" ) {
         $targets = $script:clientws.targets
 

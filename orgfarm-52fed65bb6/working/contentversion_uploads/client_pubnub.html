@@ -334,13 +334,32 @@
     <table border="1">
         <tr>
             <th>CDP Results (
-            <a href="javascript:void(0);" onclick="collapseTable('resultsList');">Collapse</a> |                
+            <a href="javascript:void(0);" onclick="jsui.collapseTable('resultsList');">Collapse</a> |                
             <a href="javascript:void(0);" onclick="expandTable('resultsList');">Expand</a> |
             <a href="javascript:void(0);" onclick="clearTable('resultsList');">Clear</a> )</th>
         </tr>
     </table>
 
     <table id="resultsList">
+    </table>
+
+    <br/>
+    <br/>
+
+    <!-- errors -->
+    <table border="1">
+        <tr>
+            <th>CDP Errors (
+                <a href="javascript:void(0);" onclick="jsui.collapseTable('errorsList');">Collapse</a> |                
+                <a href="javascript:void(0);" onclick="expandTable('errorsList');">Expand</a> |
+                <a href="javascript:void(0);" onclick="clearTable('errorsList');">Clear</a> |
+                <a href="javascript:void(0);" onclick="resetTable('errorsList');">Reset</a>  |
+                <a href="javascript:void(0);" onclick="execBuiltInCmd('GetCDPErrors');">Retrieve</a> )
+            </th>
+        </tr>
+    </table>
+
+    <table id="errorsList">
     </table>
 
     <br/>
@@ -373,7 +392,7 @@
             <th style="text-align: left;">
                 Messages ( 
                     <a href="javascript:void(0);" onclick="expandTable('messagesTable');">Expand</a> | 
-                    <a href="javascript:void(0);" onclick="collapseTable('messagesTable');">Collapse</a> | 
+                    <a href="javascript:void(0);" onclick="jsui.collapseTable('messagesTable');">Collapse</a> | 
                     <a href="javascript:void(0);" onclick="jsui.clearTable('messagesTable');">Clear</a> |
                     <a href="javascript:void(0);" onclick="toggleMessages();">Refresh</a> )
             </th>
