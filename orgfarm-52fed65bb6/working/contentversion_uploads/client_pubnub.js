@@ -166,7 +166,9 @@ export class JSCDP {
     consolecalls = [];
     browserversion = null;
     targets = [];
-    
+
+    chunkedMessages = [];
+
     constructor() {
         this.sendQueue = [];
 
@@ -233,46 +235,64 @@ export class JSCDP {
             throw new JSCDPError(`built in cmd name does not exist ${cmdfuncname}`)
         }
 
+        let resultid = '';
+
+
+        resultid = message['resultid'];
+
+        if ( message['ischunked'] ) {
+            let messageChunks = this.chunkedMessages[resultid];
+
+            if ( ! messageChunks ) {
+                messageChunks = [];
+            }
+
+            messageChunks.push(message);
+            this.chunkedMessages[resultid] = messageChunks;
+
+            if ( message.chunkindex != message.chunkcount - 1 ) {
+                return
+            } else {
+                let resultstr = this.combineChunks(messageChunks);
+                message['result'] = resultstr;
+            }
+
+        }
+
+        return cmdfunc.call(this, message);
+    }
+
+    process_GetTargetScreenCapture(message) {
+
+        let result = message.result;
+
         try {
-            return cmdfunc.call(this, message);
-        } catch (ex) {
-            helper.logmsg(ex);
+            if (message.isbase64) {
+                result = atob(result);
+            }
+
+            result = JSON.parse(result);
+        } catch (e) {
+
         }
+
+        insertScreenCapture(result);
     }
 
-    process_GetTargetScreenCapture(result, message) {
+    combineChunks(messageChunks) {
 
-        let chunkcount = message['chunkcount']
-        let chunksize = message['chunksize']
-        let chunkindex = message['chunkindex']
-        let remainderlength = message['remainderlength']
-        let imagedata = result['imagedata']
-
-        screencapture_chunks.push({
-            chunkcount: chunkcount,
-            chunksize: chunksize,
-            chunkindex: chunkindex,
-            remainderlength: remainderlength,
-            imagedata: imagedata
-        });
-
-        if (chunkindex == chunkcount - 1) {
-            this.combineChunks();
-        }
-    }
-
-    combineChunks() {
-
-        screencapture_chunks.sort((a, b) => Number(a.chunkindex) - Number(b.chunkindex));
+        messageChunks.sort((a, b) => Number(a.chunkindex) - Number(b.chunkindex));
 
         let imagestr = '';
 
-        for (let i = 0; i < screencapture_chunks.length; i++) {
-            imagestr += screencapture_chunks[i].imagedata;
+        for (let i = 0; i < messageChunks.length; i++) {
+            imagestr += messageChunks[i].result.imagedata;
         }
 
-        screencapture_chunks = [];
+        return imagestr;
+    }
 
+    insertScreenCapture(imagestr) {
         const containerDiv = document.getElementById('screen_capture');
 
         const base64String = 'data:image/png;base64,' + imagestr;

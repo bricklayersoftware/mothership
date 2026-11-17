@@ -290,8 +290,7 @@ export function refreshCommandsTable(commands) {
 
 }
 
-export function refreshTargetIdList(targets) {
-    let dropdown = document.getElementById('targetIdList');
+function t_refreshTargetIdList(targets, dropdown) {
     dropdown.options.length = 0;
 
     targets.forEach(target => {
@@ -302,6 +301,15 @@ export function refreshTargetIdList(targets) {
 
         dropdown.add(newOption);
     });
+}
+
+export function refreshTargetIdList(targets) {
+    let dropdown = document.getElementById('targetIdList');
+    t_refreshTargetIdList(targets, dropdown);
+
+    dropdown = document.getElementById('domTargetIdList');
+    t_refreshTargetIdList(targets, dropdown);
+
 
     document.getElementById('targetIdList').options[0].selected = true;
 
@@ -343,6 +351,19 @@ export function handleTargetIdChange(elem) {
 
     telem = document.getElementById('targetDebugURL');
     telem.innerText = debugurl;
+}
+
+export function handleDOMTargetIdChange(elem) {
+    let val = elem.value
+
+    let telem = document.getElementById('domTargetId');
+    telem.value = val;
+
+    telem = document.getElementById('targetIdText');
+    telem.value = val;
+
+    telem = document.getElementById('domTargetIdList');
+    telem.value = val;
 }
 
 export function handleCmdnameChange(elem) {

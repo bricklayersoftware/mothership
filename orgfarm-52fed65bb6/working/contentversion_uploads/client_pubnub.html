@@ -265,19 +265,24 @@
 
     <table border="1">
         <tr>
+            <!-- anchor -->
             <th>DOM (
             <a href="javascript:void(0);" onclick="jsui.collapseTable('domList');">Collapse</a> |                
             <a href="javascript:void(0);" onclick="jsui.expandTable('domList');">Expand</a> |
-            <a href="javascript:void(0);" onclick="jsui.clearTable('domList');">Clear</a> )</th>
+            <a href="javascript:void(0);" onclick="jsui.clearTable('domList');">Clear</a> |
+            <a href="javascript:void(0);" onclick="resetTable('targetsList');">Reset</a> |
+            <a href="javascript:void(0);" onclick="executeTargetCmd('RefreshDOM');">Retrieve</a> )
+            </th>
         </tr>
         <tr>
             <td>
-                <select id="targetIdList" name="targetIdList" onchange="handleDOMTargetIdChange(this);"></select>
+                <select id="domTargetIdList" onchange="jsui.handleDOMTargetIdChange(this);"></select>
             </td>
         </tr>
         <tr>
             <td>
-                <inpyt type="text" id="targetIdText" name="targetIdText" onchange="handleDOMTargetIdChange(this);"></select>
+                <input type="text" id="targetIdText" name="targetIdText" onchange="jsui.handleDOMTargetIdChange(this);"></select>
+                <input type="hidden" id="domTargetId" value="">
             </td>
         </tr>
     </table>
@@ -296,7 +301,7 @@
             <a href="javascript:void(0);" onclick="jsui.collapseTable('targetsList');">Collapse</a> |
             <a href="javascript:void(0);" onclick="jsui.expandTable('targetsList');">Expand</a> |
             <a href="javascript:void(0);" onclick="jsui.clearTable('targetsList');">Clear</a> |
-            <a href="javascript:void(0);" onclick="resetTable('targetsList');">Reset</a> | <!-- anchor -->
+            <a href="javascript:void(0);" onclick="resetTable('targetsList');">Reset</a> |
             <a href="javascript:void(0);" onclick="execBuiltInCmd('GetTargets');">Get Targets</a> |
             <a href="javascript:void(0);" onclick="execBuiltInCmd('RefreshTargets');">Refresh Targets</a>
             )</th>
@@ -582,7 +587,12 @@
 
         function executeTargetCmd(cmdname) {
             let payload = helper.createBuiltInCmd(cmdname);
-            payload['targetid'] = document.getElementById('targetId').value;
+
+            if (cmdname == 'RefreshDOM') {
+                payload['targetid'] = document.getElementById('domTargetId').value;
+            } else {
+                payload['targetid'] = document.getElementById('targetId').value;
+            }
 
             helper.logmsg('executeTargetCmd: ',payload);
 

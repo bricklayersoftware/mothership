@@ -1344,7 +1344,7 @@ function Process-BuiltInCommand {
             callback=$script:getdom_callback
           }
           
-        $script:clientws.AddQueue( $cmd )
+        $cdpobj.AddQueue( $cmd )
 
         return
     } elseif ( $cmd.builtincmd -eq "GetScreenshot" ) {
