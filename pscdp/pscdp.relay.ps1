@@ -1365,14 +1365,12 @@ function Process-BuiltInCommand {
         throw "unsupported command [$($cmd.builtincmd)]"
     }
 
-    $resultout.isbase64 = $true
-
     $json = $result | ConvertTo-Json -Depth 10
     $tbytes = [System.Text.Encoding]::UTF8.GetBytes($json)
     $jsonb = [System.Convert]::ToBase64String($tbytes)
 
     if ( [string]::IsNullOrEmpty($jsonb) ) {
-        throw 'not able to generate result image'
+        throw [PSCDPException]::new('not able to generate result image')
     }
 
     $chunkSize = 512
@@ -1427,6 +1425,7 @@ function Ping-DebugPort {
 
     return $targets
 }
+
 
 class PSCDPException : System.Exception {
 
