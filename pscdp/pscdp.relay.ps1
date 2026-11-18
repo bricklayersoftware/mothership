@@ -128,6 +128,7 @@ function Log-Msg {
     } else {
         Write-Host "$caller|$script:logger_logmsg_i|$Msg" -ForegroundColor Cyan
     }
+
 }
 
 function Get-Timestamp {
@@ -1373,7 +1374,7 @@ function Process-BuiltInCommand {
         throw [PSCDPException]::new('not able to generate result image')
     }
 
-    $chunkSize = 512
+    $chunkSize = 4096 # max pubnub allows is 32 KiB
     if ( $jsonb.length -ge $chunkSize ) {
         $messages = GetChunks $resultout $jsonb $chunkSize
     } else {
@@ -1530,15 +1531,24 @@ class PSCDP {
         $ht = @{}
         
         $this.targets | ForEach-Object {
-            $ht.Add($_.targetId, $_.sessionId)
+            $ht.Add($_.targetId, $_)
         }
+
+        $utargets = [System.Collections.Generic.List[PSCDPTarget]]::new()
+
+        $keys = @( 'targetId', 'type', 'title', 'url', 'attached', 'canAccessOpener', 'browserContextId' )
 
         $stargets | ForEach-Object {
-            $sid = $ht[$_.targetId]
-            $_.sessionId = $sid
+            $utarget = $ht[$_.targetId]
+            $starget = $_
+            $keys.ForEach({
+                $utarget[$_] = $starget[$_]
+            })
+
+            $utargets.Add($utarget)
         }
 
-        $this.targets = $stargets
+        $this.targets = $utargets
     }
 
     [System.Uri] GetWSUrI() {
@@ -2303,7 +2313,6 @@ class PubNub {
 
     [hashtable] static ParseResult([byte[]]$byteArray) {
         $jsonPayload = [System.Text.Encoding]::UTF8.GetString($byteArray)
-        Write-Output $jsonPayload
 
         $tresponse = $null
 

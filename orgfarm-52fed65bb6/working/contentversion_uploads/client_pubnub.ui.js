@@ -359,7 +359,7 @@ export function handleDOMTargetIdChange(elem) {
     let telem = document.getElementById('domTargetId');
     telem.value = val;
 
-    telem = document.getElementById('targetIdText');
+    telem = document.getElementById('domTargetIdText');
     telem.value = val;
 
     telem = document.getElementById('domTargetIdList');
