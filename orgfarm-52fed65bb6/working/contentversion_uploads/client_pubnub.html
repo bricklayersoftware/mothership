@@ -260,23 +260,19 @@
     <br/>
 
     <!-- DOM explorer -->
-    <div id="jsonTree">
-    </div>
-
     <table border="1">
         <tr>
-            <!-- anchor -->
             <th>DOM (
             <a href="javascript:void(0);" onclick="jsui.collapseTable('domList');">Collapse</a> |                
             <a href="javascript:void(0);" onclick="jsui.expandTable('domList');">Expand</a> |
-            <a href="javascript:void(0);" onclick="jsui.clearTable('domList');">Clear</a> |
+            <a href="javascript:void(0);" onclick="document.getElementById('domList').replaceChildren();">Clear</a> |
             <a href="javascript:void(0);" onclick="resetTable('targetsList');">Reset</a> |
             <a href="javascript:void(0);" onclick="executeTargetCmd('RefreshDOM');">Retrieve</a> )
             </th>
         </tr>
         <tr>
             <td>
-                <select id="domTargetIdList" onchange="jsui.handleDOMTargetIdChange(this);"></select>
+                <select id="domTargetIdList" onchange="handleDOMTargetIdChange(this);"></select>
             </td>
         </tr>
         <tr>
@@ -287,8 +283,9 @@
         </tr>
     </table>
 
-    <table id="domList">
-    </table>
+    <div id="domList">
+        &nbsp;<!-- dom list json tree container -->
+    </div>
 
     <br/>
     <br/>
@@ -396,7 +393,7 @@
         <tr>
             <th style="text-align: left;">
                 Messages ( 
-                    <a href="javascript:void(0);" onclick="expandTable('messagesTable');">Expand</a> | 
+                    <a href="javascript:void(0);" onclick="jsui.expandTable('messagesTable');">Expand</a> | 
                     <a href="javascript:void(0);" onclick="jsui.collapseTable('messagesTable');">Collapse</a> | 
                     <a href="javascript:void(0);" onclick="jsui.clearTable('messagesTable');">Clear</a> |
                     <a href="javascript:void(0);" onclick="toggleMessages();">Refresh</a> )
@@ -533,7 +530,7 @@
         window.jspb = jspb;
         window.jscdp = jscdp;
 
-        jscdp.updatesHandler = function(updateEvent) {
+        jscdp.updatesHandler = function(updateEvent, data) {
             if ( updateEvent == 'Targets' ) {
                 let targets = jscdp.getTargetsList();
                 jsui.refreshTargets(targets);
@@ -542,7 +539,13 @@
                 jsui.refreshTable('commandsList', commands);
             } else if ( updateEvent == 'ConsoleLogs' ) {
                 let logs = jscdp.getConsoleLogs();
+
                 jsui.refreshTable('consolelogsTable', logs);
+            } else if ( updateEvent == 'DOM' ) {
+                let targetId = data['targetId'];
+
+                let domobj = jscdp.getTargetDOM(targetId);
+                jsui.refreshTable('domList', domobj);
             }
         }
 
@@ -585,11 +588,31 @@
             jspb.sendMessage(payload);
         } window.execBuiltInCmd = execBuiltInCmd;
 
+        function getDomTargetId() {
+            let targetid = document.getElementById('domTargetId').value;
+
+            if ( helper.isNullOrEmpty(targetid) ) {
+                targetid = document.getElementById('domTargetIdList').value;
+            }
+
+            if ( helper.isNullOrEmpty(targetid) ) {
+                targetid = document.getElementById('domTargetIdText').value;
+            }
+
+            document.getElementById('domTargetIdText').value = targetid;
+            document.getElementById('domTargetId').value = targetid;
+            document.getElementById('domTargetIdList').value = targetid;
+
+            return targetid;
+        }
+
         function executeTargetCmd(cmdname) {
             let payload = helper.createBuiltInCmd(cmdname);
 
-            if (cmdname == 'RefreshDOM') {
-                payload['targetid'] = document.getElementById('domTargetId').value;
+            if ( cmdname == 'RefreshDOM' ) {
+                let targetid = getDomTargetId();
+
+                payload['targetid'] = targetid
             } else {
                 payload['targetid'] = document.getElementById('targetId').value;
             }
@@ -619,6 +642,27 @@
             let items = retfunc();
             jsui.refreshTable(tablename, items);
         } window.resetTable = resetTable;
+
+        function handleDOMTargetIdChange(elem) {
+            let val = elem.value
+
+            let telem = document.getElementById('domTargetId');
+            telem.value = val;
+
+            telem = document.getElementById('domTargetIdText');
+            telem.value = val;
+
+            telem = document.getElementById('domTargetIdList');
+            telem.value = val;
+
+            let domobj = jscdp.getTargetDOM(val);
+            
+            domobj = domobj || [];
+
+            jsui.refreshTable('domList', domobj);
+
+        } window.handleDOMTargetIdChange = handleDOMTargetIdChange;
+
 
     </script>
 

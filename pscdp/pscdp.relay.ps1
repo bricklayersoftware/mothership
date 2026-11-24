@@ -821,6 +821,10 @@ $script:getdom_callback = {
         [PSCDPResult]$Response, [PSCDP]$cdpobj
     )
 
+    if ( $Response.iserror ) {
+        return
+    } 
+
     $obj = $Response.result.root
 
     $result = ProcessDOMObj($obj)
@@ -839,7 +843,7 @@ $script:getdom_callback = {
         resultid=$(Get-Random -Minimum 10000000 -Maximum 99999999)
         ts=$(Get-Timestamp)
         result=$null
-        targetId=$Response.cmd.target.targetId
+        targetId=$cmd.targetId
         isbase64=$true
     }
 
@@ -848,9 +852,21 @@ $script:getdom_callback = {
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonstr)
     $base64str = [Convert]::ToBase64String($bytes)
 
-    $resultout['result'] = $base64str
+    $chunkSize = 4096 # max pubnub allows is 32 KiB
+    if ( $base64str.length -ge $chunkSize ) {
+        $messages = GetChunks $resultout $base64str $chunkSize
+    } else {
+        $resultout['result'] = $base64str
+        $resultout['ischunked'] = $false
+        $script:pb.SendMessage($resultout)
 
-    $script:pb.SendMessage($resultout)
+        return
+    }
+
+    $messages | ForEach-Object {
+        $script:pb.SendMessage($_)
+    }
+
 }
 
 function GetChunks {
@@ -1130,9 +1146,8 @@ function Process-CDP {
 }
 
 function Send-ChunkedResult {
-    param([hashtable]$result, [hashtable]$resultout)
+    param([hashtable]$chunkobj, [hashtable]$resultout)
 
-    $chunkobj = $result['chunkobj']
     $chunks = $chunkobj['chunks']
     $chunkcount = [int32]$chunks.Count
 
@@ -1337,7 +1352,7 @@ function Process-BuiltInCommand {
         $cmd = @{ 
             method="DOM.getDocument";
             params = @{
-              depth=1;
+              depth=3;
               pierce=$true;
             };
             targetid=$targetid;
@@ -2484,6 +2499,9 @@ while ( $true ) {
         [PSCDP]::Iterate($script:clientit)
     } catch {
         Log-Msg $_
+        $cdpobj = $script:clientit['cdpobj']
+        $cdpobj.exceptions.Add($_)
+        # anchor
     }
 
     Start-Sleep -Milliseconds $d

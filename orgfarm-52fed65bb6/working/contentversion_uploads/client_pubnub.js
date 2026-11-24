@@ -166,6 +166,7 @@ export class JSCDP {
     consolecalls = [];
     browserversion = null;
     targets = [];
+    domlist = {};
 
     chunkedMessages = [];
 
@@ -183,7 +184,7 @@ export class JSCDP {
         this.targets = [];
     }
 
-    updatesHandler = (event) => {
+    updatesHandler = (event, data) => {
         throw new JSCDPError('updatesHandler not implemented');
     };
 
@@ -210,6 +211,15 @@ export class JSCDP {
 
         this.updatesHandler('Targets');
     }
+
+    getTargetDOM(targetId) {
+        return this.domlist[targetId];
+    }
+
+    setTargetDOM(domobj, targetId) {
+        this.domlist[targetId] = domobj;
+        this.updatesHandler('DOM', { "targetId": targetId } );
+    } 
 
     setConsoleLogs(logs) {
         this.consolecalls = logs;
@@ -347,21 +357,21 @@ export class JSCDP {
         helper.logmsg('GetTargetHTML');
     }
 
-    process_RefreshDOM(result, message) {
+    process_RefreshDOM(message) {
 
-        result = atob(result);
+        let result = message.result;
 
         try {
+            if ( result ) {
+                result = atob(result);
+            }
+
             result = JSON.parse(result);
-        } catch (ex) {
-            helper.logmsg(ex);
+        } catch (e) {
+
         }
 
-        result = result || {};
-
-        refreshTable('domList', result);
-
-        reloadJsonTree(result);
+        this.setTargetDOM(result, message['targetId']);
     }
 
     process_GetFrontendUrls(result, message) {

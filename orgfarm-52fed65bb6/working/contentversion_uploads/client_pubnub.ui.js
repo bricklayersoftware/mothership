@@ -353,18 +353,6 @@ export function handleTargetIdChange(elem) {
     telem.innerText = debugurl;
 }
 
-export function handleDOMTargetIdChange(elem) {
-    let val = elem.value
-
-    let telem = document.getElementById('domTargetId');
-    telem.value = val;
-
-    telem = document.getElementById('domTargetIdText');
-    telem.value = val;
-
-    telem = document.getElementById('domTargetIdList');
-    telem.value = val;
-}
 
 export function handleCmdnameChange(elem) {
     // console.log('handleCmdnameChange');
@@ -458,11 +446,26 @@ export function clearTable(tableid) {
 
 export function refreshTable(tableid, items) {
 
+    if ( tableid == 'domList' ) {
+        const container = document.getElementById('domList');
+
+        const jsontree = createJSONTree(items);
+        jsontree['id'] = 'domList';
+
+        const parent = container.parentNode;
+
+        if (parent) {
+            parent.replaceChild(jsontree, container);
+        }
+
+        return;
+    }
+
     clearTable(tableid);
 
     const table = document.getElementById(tableid);
 
-    if (!Array.isArray(items)) {
+    if ( ! Array.isArray(items) ) {
         items = [items];
     }
 
@@ -582,3 +585,87 @@ export function insertJSCode(jscodename) {
     let elem = document.getElementById('evaluateCmd');
     elem.value = jscodestr;
 }
+
+export function isPrimitive(obj) {
+    if (typeof obj !== 'object' || obj === null) {
+        return true;
+    }
+
+    return false;
+}
+
+export function insertContainerRowObj(row, key, value, isArray, arrLength) {
+    let txt = '';
+
+    if ( isArray ) {
+        txt = 'index: ['+key+'] / ['+arrLength+']';
+    } else {
+        txt = key + ':';
+    }
+
+    const toggleBtn = document.createElement('a');
+    toggleBtn.textContent = '[+] ' + txt; // [-]
+    toggleBtn.style.cursor = 'pointer';
+    toggleBtn.style.fontWeight = 'bold';
+
+    const contentDiv = document.createElement('div');
+    contentDiv.style.display = 'none'; // 'block';
+    let elem = createJSONTree(value);
+    contentDiv.appendChild(elem);
+
+    toggleBtn.onclick = function () {
+        if (contentDiv.style.display === 'none') {
+            contentDiv.style.display = 'block';
+
+            toggleBtn.textContent = '[-] ' + txt;
+        } else {
+            contentDiv.style.display = 'none';
+
+            toggleBtn.textContent = '[+] ' + txt;
+        }
+    };
+
+    row.appendChild(toggleBtn);
+    row.appendChild(contentDiv);
+}
+
+export function createJSONTree(data) {
+    if ( isPrimitive(data) ) { //(typeof data !== 'object' || data === null) {
+        return document.createTextNode(String(data));
+    }
+
+    const container = document.createElement('div');
+    container.style.marginLeft = '15px';
+
+    const isArray = Array.isArray(data);
+    const arrLength = isArray ? data.length : null;
+
+    const isNonPrimitive = (val) => val !== null && typeof val === "object";
+
+    const sortedEntries = Object.entries(data).sort(([, a], [, b]) => {
+        return Number(isNonPrimitive(a)) - Number(isNonPrimitive(b));
+    });
+
+    for (const [key, value] of sortedEntries) {
+        const row = document.createElement('div');
+        row.style.margin = '2px 0';
+
+        if ( isPrimitive(value) ) {
+            row.classList.add("terminal");
+
+            const textNode = document.createTextNode(
+                (isArray ? 'index: ' : '' ) + '[' + key + ']: ' + String(value)
+            );
+
+            row.appendChild(textNode);
+        } else {
+            row.classList.add("container");
+            insertContainerRowObj(row, key, value, isArray, arrLength);
+        }
+
+        container.appendChild(row);
+    }
+
+    return container;
+}
+
