@@ -1099,7 +1099,7 @@ function ChunkBytes {
 
 # http GET/POST requests to chrome cdp
 function Process-CDP {
-    param($cmd)
+    param($cmd) # TODO implement PSBuiltInCmd class
 
     $devurl = $cmd.url
 
@@ -1127,54 +1127,40 @@ function Process-CDP {
 
     $ret = @{
         headers=$httpres.Headers
-        body=$null
+        body=$bodystr
         requesturl=$devurl
-        ischunked=$false
-        chunkobj=$null
         statuscode=$httpres.StatusCode
-    }
-
-    if ( $bodystr.Length -ge 16384 ) {
-        $chunkobj = ChunkBytes $bodystr
-        $ret['chunkobj'] = $chunkobj
-        $ret['ischunked'] = $true
-    } else {
-        $ret['body'] = $bodystr
     }
 
     return $ret
 }
 
-function Send-ChunkedResult {
-    param([hashtable]$chunkobj, [hashtable]$resultout)
+function Send-Result {
+    param([hashtable]$result, [hashtable]$resultout)
 
-    $chunks = $chunkobj['chunks']
-    $chunkcount = [int32]$chunks.Count
+    $json = $result | ConvertTo-Json -Depth 10
+    $tbytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+    $jsonb = [System.Convert]::ToBase64String($tbytes)
 
-    $tresult = @{
-        chunksize = $chunkobj['chunksize']
-        chunkcount = $chunkobj['chunkcount']
-        remainderlength = $chunkobj['remainderlength']
-        imagedata = $null
-        chunkindex = -1
+    if ( [string]::IsNullOrEmpty($jsonb) ) {
+        throw [PSCDPException]::new('not able to generate result image')
     }
 
-    for ( $i=0; $i -lt $chunkcount; $i++ ) {
+    $chunkSize = 4096 # max pubnub allows is 32 KiB
 
-        $tresult['imagedata'] = $chunks[$i]
-        $tresult['chunkindex'] = $i
+    if ( $jsonb.length -ge $chunkSize ) {
+        $messages = GetChunks $resultout $jsonb $chunkSize
+    } else {
+        $resultout['result'] = $jsonb
+        $resultout['ischunked'] = $false
+        $script:pb.SendMessage($resultout)
 
-        if ( $i -eq 0 ) {
-            $tresult['requesturl'] = $result['requesturl']
-            $tresult['statuscode'] = $result['statuscode']
-            $tresult['headers'] = $result['headers']
-        }
-
-        $resultout['result'] = $tresult
-
-        $script:pubnubws.SendPBMessage($resultout)
+        return
     }
 
+    $messages | ForEach-Object {
+        $script:pb.SendMessage($_)
+    }
 }
 
 function Process-BuiltInCommand {
@@ -1197,13 +1183,7 @@ function Process-BuiltInCommand {
         $result = Get-FrontendUrls
     } elseif ( $cmd.builtincmd -eq "ProcessCDP" ) {
         $result = Process-CDP($cmd)
-
-        $ischunked = $result['ischunked']
-
-        if ( $ischunked ) {
-            Send-ChunkedResult($result, $resultout)
-            return
-        }
+        $result
 
     } elseif ( $cmd.builtincmd -eq "ExecCDPCommand" ) {
         $result = Exec-CDP($cmd)
@@ -1381,29 +1361,7 @@ function Process-BuiltInCommand {
         throw "unsupported command [$($cmd.builtincmd)]"
     }
 
-    $json = $result | ConvertTo-Json -Depth 10
-    $tbytes = [System.Text.Encoding]::UTF8.GetBytes($json)
-    $jsonb = [System.Convert]::ToBase64String($tbytes)
-
-    if ( [string]::IsNullOrEmpty($jsonb) ) {
-        throw [PSCDPException]::new('not able to generate result image')
-    }
-
-    $chunkSize = 4096 # max pubnub allows is 32 KiB
-    if ( $jsonb.length -ge $chunkSize ) {
-        $messages = GetChunks $resultout $jsonb $chunkSize
-    } else {
-        $resultout['result'] = $jsonb
-        $resultout['ischunked'] = $false
-        $script:pb.SendMessage($resultout)
-
-        return
-    }
-
-    $messages | ForEach-Object {
-        $script:pb.SendMessage($_)
-    }
-
+    Send-Result $result $resultout
 }
 
 # NOTE only supports pb messages with builtincmd payload
@@ -1447,6 +1405,10 @@ class PSCDPException : System.Exception {
 
     PSCDPException([string]$Message) : base($Message) {
     }
+}
+
+class PSBuiltInCmd {
+
 }
 
 class PSCDP {
@@ -1640,14 +1602,6 @@ class PSCDP {
 
         $ttargets = $this.GetTargets()        
         $this.targets = $ttargets
-
-        if ( ! [string]::IsNullOrEmpty($this.pubnuburl) ) {
-            $this.pubnubTarget = $this.GetPBTarget()
-
-            if ( $null -eq $this.pubnubTarget ) {
-                $this.pubnubTarget = $this.CreateTab($this.pubnuburl)
-            }
-        }
 
         $this.wsUri = $this.GetWSUrI()
 

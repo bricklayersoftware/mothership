@@ -1,0 +1,30 @@
+
+    In Chromium's DevTools frontend, devtools_app.html is the primary, full-featured entry point for standard 
+    browser debugging, while inspector.html is a legacy/fallback entry point mostly kept for backward compatibility 
+    and remote debugging URLs.
+
+    Main DevTools UI: 
+    devtools://devtools/bundled/devtools_app.html
+
+    Standalone Inspector Entrypoint: 
+    devtools://devtools/bundled/inspector.html
+
+    devtools://devtools/bundled/inspector.html?ws=localhost:9222/devtools/page/<PAGE_ID>
+
+    http://localhost:<DEVTOOLS_FRONTEND_PORT>/devtools/inspector.html?ws=localhost:8080
+
+    Page-level (/devtools/page/<id>)
+        Attaches directly to a single tab's renderer. You immediately see the DOM, 
+        Console, and Network tabs for that specific page, and the DevTools window 
+        closes if that tab closes.
+    
+    Browser-level (/devtools/browser/<uuid>)
+        Attaches to the root browser session. Instead of inspecting a single tab's 
+        DOM right away, the UI acts as a browser-wide inspector (similar to chrome://inspect). 
+        
+        It gives you access to browser-wide domains (like Target, Browser, SystemInfo, 
+        and Tracing) and lets you discover, open, or attach to individual page targets 
+        from within the same session.
+
+
+        
