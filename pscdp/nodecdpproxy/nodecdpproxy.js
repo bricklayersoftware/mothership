@@ -120,28 +120,7 @@ subscription.onMessage = processIncommingMsg;
 
 subscription.subscribe();
 
-let cmdindex=0;
-let commandslist = [];
 let pbmessages = [];
-
-// --- END globals
-
-function addChunk(outgoingcmd, chunkobj) {
-
-    if ( ! outgoingcmd['chunks'] ) {
-        outgoingcmd['chunks'] = [];
-    }
-
-    outgoingcmd.chunks.push(chunkobj);
-
-    let imagedata = chunkobj.imagedata;
-    let chunksize = chunkobj.chunksize;
-    let chunkcount = chunkobj.chunkcount;
-    let remainderlength = chunkobj.remainderlength;
-    let chunkindex = chunkobj.chunkindex;
-
-    logmsg(`chunksize: ${chunksize} imagedata: ${imagedata.length} chunkindex: ${chunkindex} chunkcount: ${chunkcount} remainderlength: ${remainderlength}`);
-}
 
 function assembleChunks(chunks) {
 
@@ -150,11 +129,11 @@ function assembleChunks(chunks) {
     for ( let i = 0; i<chunks.length; i++) {
         let chunkobj = chunks[i];
 
-        let chunkindex = chunkobj.chunkindex;
+        let chunkindex = chunkobj['chunkindex'];
         let chunksize = chunkobj['chunksize']
         let chunkcount = chunkobj['chunkcount'];
         let remainderlength = chunkobj['remainderlength']
-        let imagedata = chunkobj['chunkcount'];
+        let imagedata = chunkobj['imagedata'];
 
         if ( ! ( chunkindex == i && chunks.length == chunkcount ) ) {
             throw new Error("chunks not valid -- mismatch index and/or chunk count");
@@ -168,59 +147,110 @@ function assembleChunks(chunks) {
 
 function processIncommingMsg(messageEvent) {
 
-    let builtincmd = messageEvent.message;
+    let result = messageEvent.message;
 
-    if ( ! builtincmd ) {
+    if ( ! result ) {
         throw new Error('builtincmd is null');
     }
 
-    logmsg('received message from: '+builtincmd.source+' to: ' + builtincmd.destination + ' ts: '+builtincmd.ts + ' cmd: '+builtincmd.builtincmd + ' cmdid: '+builtincmd.cmdid+ (builtincmd.resultid ? ' resultid: '+builtincmd.resultid : ' noresult'));
+    logmsg(`received message from: ${result.source} to: ${result.destination} ts: ${result.ts} cmd: ${result.builtincmd} cmdid: ${result.cmdid} resultid: ${result.resultid}`);
 
-    if ( builtincmd.destination != 'nodecdpproxy.js' ) {
+    if ( ! result.builtincmd == 'ProcessCDPBridge' ) {
+        return
+    }
+
+    if ( result.destination != 'nodecdpproxy.js' ) {
         return;
     }
 
-    logmsg('processing message');
+    let resultid = result.resultid;
 
+    if ( ! resultid ) {
+        throw new Error('resultid is null');
+    }
 
+    let ischunked = result['ischunked']
+    let payload = result['result']
+    let isbase64 = result['isbase64']
+
+    if ( ! ischunked ) {
+        pbmessages[resultid] = result;
+    } else {
+        let chunk = {
+            "imagedata":payload['imagedata'],
+            "chunkcount":payload['chunkcount'],
+            "chunkindex":payload['chunkindex'],
+            "chunksize":payload['chunksize'],
+            "remainderlength":payload['remainderlength']
+        };
+
+        let pbmsg = pbmessages[resultid];
+
+        if ( ! pbmsg ) {
+            pbmsg = result;
+
+            pbmsg['chunkobj'] = [ chunk ]; 
+            pbmessages[resultid] = pbmsg;
+        } else {
+            pbmsg['chunkobj'].push(chunk);
+        }
+
+        if ( payload['chunkindex'] == payload['chunkcount'] - 1 ) {
+            let chunks = pbmsg['chunkobj'];
+            bodystr = assembleChunks(chunks);
+            pbmsg['result'] = bodystr;
+        } else {
+            return;
+        }
+    }
+    
+    pbmsg = pbmessages[resultid];
+    payload = pbmsg['result'];
+
+    if ( pbmsg['isbase64'] ) {
+        payload = Buffer.from(payload, 'base64').toString('utf8');
+    }
+
+    
+    wss.clients.forEach((client) => {
+        if (client.readyState === 1) { // 1 = WebSocket.OPEN
+            client.send(payload);
+        }
+    });
 
 }
 
-const wss = new WebSocket.Server({ port: 8080 });
-console.log('Local WebSocket proxy listening on ws://localhost:8080');
+const wss = new WebSocket.Server({ port: 8123 });
+logmsg('Local WebSocket proxy listening on ws://localhost:8123');
 
 wss.on('connection', (ws) => {
-  console.log('Local client connected');
+    logmsg('Local client connected');
 
-  // 3. Forward incoming WebSocket messages to PubNub
-  ws.on('message', async (rawData) => {
-    try {
-      const messageText = rawData.toString();
-      
-      // Attempt to parse JSON, fallback to wrapping plain text
-      let payload;
-      try {
-        payload = JSON.parse(messageText);
-      } catch {
-        payload = { text: messageText };
-      }
+    ws.on('message', async (rawData) => {
 
-      const result = await pubnub.publish({
-        channel: TARGET_CHANNEL,
-        message: payload,
-      });
+        try {
+            const base64String = Buffer.from(rawData).toString('base64');
 
-      console.log('Published to PubNub. Timetoken:', result.timetoken);
-      
-      // Optional: Acknowledge receipt back to the local WebSocket client
-      ws.send(JSON.stringify({ status: 'forwarded', timetoken: result.timetoken }));
-    } catch (error) {
-      console.error('PubNub publish error:', error);
-      ws.send(JSON.stringify({ status: 'error', message: error.message }));
-    }
-  });
+            let payload = {
 
-  ws.on('close', () => {
-    console.log('Local client disconnected');
-  });
+            };
+
+            const result = await pubnub.publish({
+                channel: TARGET_CHANNEL,
+                message: payload,
+            });
+
+            logmsg('Published to PubNub. Timetoken:', result.timetoken);
+
+            // ws.send(JSON.stringify({ status: 'forwarded', timetoken: result.timetoken }));
+        } catch (error) {
+            logmsg('PubNub publish error:', error);
+            // ws.send(JSON.stringify({ status: 'error', message: error.message }));
+        }
+    });
+
+    ws.on('close', () => {
+        logmsg('Local client disconnected');
+    });
+
 });
