@@ -1,0 +1,75 @@
+/*
+ * Copyright 2021 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+:host {
+  overflow: hidden;
+}
+
+div {
+  line-height: 1.7em;
+}
+
+.arrow-icon-button {
+  cursor: pointer;
+  padding: var(--sys-size-1) 0;
+  border: none;
+  background: none;
+  margin-right: var(--sys-size-2);
+}
+
+.arrow-icon {
+  display: inline-block;
+  mask-image: var(--image-file-triangle-right);
+  background-color: var(--icon-default);
+  margin-top: var(--sys-size-2);
+  height: var(--sys-size-7);
+  width: var(--sys-size-7);
+  transition: transform 200ms;
+}
+
+.arrow-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.expandable-list-container {
+  display: flex;
+  margin-top: var(--sys-size-3);
+}
+
+.expandable-list-items {
+  overflow: hidden;
+}
+
+.link,
+.devtools-link {
+  color: var(--sys-color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+  outline-offset: var(--sys-size-2);
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--sys-typescale-body4-size);
+
+  &:focus-visible {
+    outline: var(--sys-size-2) solid var(--sys-color-state-focus-ring);
+    outline-offset: 0;
+    border-radius: var(--sys-shape-corner-extra-small);
+  }
+}
+
+button.link {
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

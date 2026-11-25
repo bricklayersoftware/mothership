@@ -1,0 +1,18 @@
+Name: Marked
+Short Name: marked
+URL: https://github.com/markedjs/marked
+Version: 18.0.4
+Revision: 0a2cd54cbe91911890e4460ae4fd7b9966e05654
+Update Mechanism: Manual
+License: BSD-3-Clause, MIT
+License File: LICENSE
+Security Critical: no
+Shipped: yes
+
+Description:
+Light-weight markdown parser and renderer.
+
+To update this package, run the following command (replace version number with updated version number):
+```bash
+wget -qO- https://registry.npmjs.org/marked/-/marked-18.0.4.tgz | tar xzf -
+```

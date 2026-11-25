@@ -4,7 +4,7 @@
     and remote debugging URLs.
 
     Main DevTools UI: 
-    devtools://devtools/bundled/devtools_app.html
+    devtools://devtools/bundled/devtools_app.html?ws=localhost:8123/devtools/browser/36a42bbf-cb3d-492b-873a-91e69ea4306b
 
     Standalone Inspector Entrypoint: 
     devtools://devtools/bundled/inspector.html
@@ -26,5 +26,13 @@
         and Tracing) and lets you discover, open, or attach to individual page targets 
         from within the same session.
 
+    custom-devtools-frontend
+    --custom-devtools-frontend is a Chromium command-line flag that tells the browser to load its DevTools UI from a custom URL or local file path instead of the built-in frontend. It lets developers run a modified or locally built version of the Chrome DevTools frontend against a browser instance.
+    --custom-devtools-frontend=file:///path/to/devtools-frontend/out/Default/gen/front_end
+    --custom-devtools-frontend=http://localhost:8090/front_end
 
-        
+    "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9223 --profile-directory=Default --remote-allow-origins=* --restore-last-session --user-data-dir="C:\Users\bradf\AppData\Local\chrome-test"
+
+    https://www.npmjs.com/package/chrome-devtools-frontend
+    https://developer.chrome.com/docs/devtools/
+    https://github.com/ChromeDevTools/devtools-frontend

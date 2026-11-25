@@ -1,0 +1,71 @@
+/*
+ * Copyright 2022 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+@scope to (devtools-widget > *) {
+  :scope {
+    display: block;
+  }
+
+  devtools-header-section-row:last-of-type {
+    margin-bottom: 10px;
+  }
+
+  devtools-header-section-row:first-of-type {
+    margin-top: var(--sys-size-2);
+  }
+
+  .call-to-action {
+    background-color: var(--sys-color-neutral-container);
+    padding: var(--sys-size-5);
+    border-radius: 5px;
+    margin: var(--sys-size-3);
+  }
+
+  .call-to-action-body {
+    display: flex;
+    gap: var(--sys-size-4);
+    padding: var(--sys-size-4) 0;
+    margin-left: var(--sys-size-1);
+    border-left: var(--sys-size-2) solid var(--issue-color-yellow);
+    padding-left: 11px;
+    line-height: var(--sys-size-9);
+  }
+
+  .call-to-action .explanation {
+    font-weight: bold;
+  }
+
+  .call-to-action code {
+    font-size: 90%;
+  }
+
+  .call-to-action .example .comment::before {
+    content: " — ";
+  }
+
+  .link,
+  .devtools-link {
+    color: var(--sys-color-primary);
+    text-decoration: underline;
+    cursor: pointer;
+    outline-offset: var(--sys-size-2);
+  }
+
+  .explanation .link {
+    font-weight: normal;
+  }
+
+  .inline-icon {
+    margin-top: var(--sys-size-2);
+  }
+
+  @media (forced-colors: active) {
+    .link,
+    .devtools-link {
+      color: linktext;
+      text-decoration-color: linktext;
+    }
+  }
+}

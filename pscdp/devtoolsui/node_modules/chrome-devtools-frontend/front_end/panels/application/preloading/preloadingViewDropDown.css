@@ -1,0 +1,17 @@
+/*
+ * Copyright 2024 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+.widget {
+  padding: var(--sys-size-2) var(--sys-size-1) var(--sys-size-2) var(--sys-size-2);
+}
+
+.title {
+  padding-left: var(--sys-size-5);
+}
+
+.subtitle {
+  padding-left: var(--sys-size-5);
+}

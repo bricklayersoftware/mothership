@@ -1,0 +1,48 @@
+/*
+ * Copyright 2021 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+:host {
+  display: block;
+}
+
+.content {
+  background-color: var(--sys-color-cdt-base-container);
+  display: grid;
+  grid-template-columns: min-content 1fr;
+  user-select: text;
+  margin: var(--sys-size-5) 0;
+}
+
+.report-header-wrapper {
+  border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
+}
+
+.report-title {
+  padding: var(--sys-size-7) var(--sys-size-9);
+  font: var(--sys-typescale-headline4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--sys-color-on-surface);
+  background-color: var(--sys-color-cdt-base-container);
+  margin: 0;
+}
+
+.report-url {
+  background: none;
+  border-radius: var(--sys-size-2);
+  border: none;
+  color: var(--text-link);
+  cursor: pointer;
+  display: block;
+  font: var(--sys-typescale-body4-regular);
+  height: unset;
+  margin: 0;
+  outline-offset: var(--sys-size-2);
+  outline: none;
+  padding: 0 !important; /* stylelint-disable-line declaration-no-important */
+  text-decoration: underline;
+}

@@ -1,0 +1,79 @@
+{
+  "name": "@puppeteer/replay",
+  "version": "4.0.2",
+  "description": "Replay is a library which provides an API to replay and stringify recordings created using Chrome DevTools Recorder](https://developer.chrome.com/docs/devtools/recorder/)",
+  "types": "lib/main.d.ts",
+  "main": "lib/main.js",
+  "bin": {
+    "@puppeteer/replay": "lib/cli.js",
+    "replay-extension-test": "lib/extension-test.js"
+  },
+  "repository": "github:puppeteer/replay",
+  "directories": {
+    "doc": "docs"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "test": "npm run build && tsc -p tsconfig.test.json && node --test --test-reporter=spec --import ./lib/test/setup.js lib/test/*.test.js lib/**/*.test.js",
+    "test:headful": "cross-env PUPPETEER_HEADFUL=true npm run test",
+    "test:fast": "npm run test -- --ignore=test/e2e/**/*",
+    "lint": "npm run lint:format",
+    "lint:format": "prettier --check . && npm run eslint",
+    "format": "prettier --write . && eslint --fix .",
+    "eslint": "eslint .",
+    "docs": "typedoc --tsconfig tsconfig.json --readme none --gitRevision main --externalPattern --excludeExternals --excludeProtected --excludePrivate --plugin typedoc-plugin-markdown --out docs/api src/main.ts && npm run format",
+    "clean": "rimraf lib",
+    "build": "npm run clean && rollup --config rollup.config.js"
+  },
+  "files": [
+    "lib",
+    "!lib/**/*.d.ts",
+    "!lib/**/*.d.ts.map",
+    "!lib/test/**/*",
+    "lib/main.d.ts"
+  ],
+  "author": "Chrome DevTools authors",
+  "license": "Apache-2.0",
+  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@rollup/plugin-typescript": "12.3.0",
+    "@rollup/wasm-node": "4.60.3",
+    "@types/mime": "4.0.0",
+    "@types/node": "25.0.9",
+    "@types/ws": "8.18.1",
+    "typescript-eslint": "8.59.3",
+    "cross-env": "10.1.0",
+    "eslint": "9.39.2",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-prettier": "5.5.5",
+    "eslint-plugin-tsdoc": "0.5.1",
+    "globals": "^17.0.0",
+    "lighthouse": "^13.0.1",
+    "mime": "4.1.0",
+    "prettier": "3.8.3",
+    "puppeteer": "25.0.4",
+    "puppeteer-core": "25.0.4",
+    "rimraf": "6.1.2",
+    "rollup": "4.60.4",
+    "rollup-plugin-dts": "6.4.1",
+    "typedoc": "0.28.19",
+    "typedoc-plugin-markdown": "4.11.0",
+    "typescript": "6.0.3",
+    "ws": "8.20.1"
+  },
+  "peerDependencies": {
+    "lighthouse": ">=13.0.0",
+    "puppeteer": ">=25.0.0"
+  },
+  "peerDependenciesMeta": {
+    "puppeteer": {
+      "optional": true
+    },
+    "lighthouse": {
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,45 @@
+// Copyright 2021 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import * as i18n from '../../core/i18n/i18n.js';
+import type * as Platform from '../../core/platform/platform.js';
+import {createIcon} from '../../ui/kit/kit.js';
+import * as UI from '../../ui/legacy/legacy.js';
+
+import {ApplicationPanelTreeElement} from './ApplicationPanelTreeElement.js';
+import * as ApplicationComponents from './components/components.js';
+import type {ResourcesPanel} from './ResourcesPanel.js';
+
+const UIStrings = {
+  /**
+   * @description Label for the private state tokens tree element in the Application panel sidebar.
+   */
+  trustTokens: 'Private state tokens',
+} as const;
+const str_ = i18n.i18n.registerUIStrings('panels/application/TrustTokensTreeElement.ts', UIStrings);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
+export class TrustTokensTreeElement extends ApplicationPanelTreeElement {
+  private view?: ApplicationComponents.TrustTokensView.TrustTokensView;
+
+  constructor(storagePanel: ResourcesPanel) {
+    super(storagePanel, i18nString(UIStrings.trustTokens), false, 'private-state-tokens');
+    const icon = createIcon('database');
+    this.setLeadingIcons([icon]);
+  }
+
+  override get itemURL(): Platform.DevToolsPath.UrlString {
+    return 'trustTokens://' as Platform.DevToolsPath.UrlString;
+  }
+
+  override onselect(selectedByUser?: boolean): boolean {
+    super.onselect(selectedByUser);
+    if (!this.view) {
+      this.view = new ApplicationComponents.TrustTokensView.TrustTokensView();
+    }
+    this.showView(this.view);
+    UI.UIUserMetrics.UIUserMetrics.instance().panelShown('trust-tokens');
+    return false;
+  }
+}

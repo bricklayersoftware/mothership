@@ -1,0 +1,366 @@
+// Copyright 2026 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import * as i18n from '../../../core/i18n/i18n.js';
+import * as Platform from '../../../core/platform/platform.js';
+import * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
+import * as Trace from '../../../models/trace/trace.js';
+import * as Buttons from '../../../ui/components/buttons/buttons.js';
+import * as UI from '../../../ui/legacy/legacy.js';
+import * as Lit from '../../../ui/lit/lit.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
+
+import cwvMetricsStyles from './cwvMetrics.css.js';
+import * as Insights from './insights/insights.js';
+import metricValueStyles from './metricValueStyles.css.js';
+import {isFieldWorseThanLocal, NumberWithUnit} from './Utils.js';
+
+const {html} = Lit.StaticHtml;
+
+const UIStrings = {
+  /**
+   * @description Tooltip and aria label for a metric value indicating its score classification in the Performance panel.
+   * @example {INP} PH1
+   * @example {1.2s} PH2
+   * @example {poor} PH3
+   */
+  metricScore: '{PH1}: {PH2} {PH3} score',
+  /**
+   * @description Tooltip and aria label for a metric value indicating that the data is unavailable in the Performance panel.
+   * @example {INP} PH1
+   */
+  metricScoreUnavailable: '{PH1}: unavailable',
+  /**
+   * @description Label denoting that metrics were observed in the field from real user data (CrUX), and whether the data is from the URL or origin dataset in the Performance panel.
+   * @example {URL} PH1
+   */
+  fieldScoreLabel: 'Field ({PH1})',
+  /**
+   * @description Label for an option that selects the specific URL in the Performance panel.
+   */
+  urlOption: 'URL',
+  /**
+   * @description Label for an option that selects the entire origin in the Performance panel.
+   */
+  originOption: 'Origin',
+  /**
+   * @description Tooltip text for the dismiss button that closes a warning popup in the Performance panel.
+   */
+  dismissTitle: 'Dismiss',
+  /**
+   * @description Title shown in a warning dialog when field metrics are worse than locally observed metrics in the Performance panel.
+   */
+  fieldMismatchTitle: 'Field & local metrics mismatch',
+  /**
+   * @description Warning notice shown when field metrics are worse than locally observed metrics in the Performance panel.
+   */
+  fieldMismatchNotice:
+      'Local and field metrics [may not match](https://web.dev/articles/lab-and-field-data-differences) for several reasons. ' +
+      'Adjust [throttling settings and device emulation](https://developer.chrome.com/docs/devtools/device-mode) to analyze traces more similar to the average user’s environment.',
+} as const;
+
+const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/CWVMetrics.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
+interface LocalMetrics {
+  lcp: {value: Trace.Types.Timing.Micro, event: Trace.Types.Events.AnyLargestContentfulPaintCandidate}|null;
+  cls: {value: number, worstClusterEvent: Trace.Types.Events.Event|null};
+  inp: {value: Trace.Types.Timing.Micro, event: Trace.Types.Events.SyntheticInteractionPair}|null;
+}
+
+function getLocalMetrics(parsedTrace: Trace.TraceModel.ParsedTrace|null, insightSetKey: string|null): LocalMetrics|
+    null {
+  if (!parsedTrace || !insightSetKey) {
+    return null;
+  }
+
+  const insightSet = parsedTrace.insights?.get(insightSetKey);
+  if (!insightSet) {
+    return null;
+  }
+
+  const lcp = Trace.Insights.Common.getLCP(insightSet);
+  const cls = Trace.Insights.Common.getCLS(insightSet);
+  const inp = Trace.Insights.Common.getINP(insightSet);
+
+  return {lcp, cls, inp};
+}
+
+export function getFieldMetrics(parsedTrace: Trace.TraceModel.ParsedTrace|null, insightSetKey: string|null):
+    Trace.Insights.Common.CrUXFieldMetricResults|null {
+  if (!parsedTrace || !parsedTrace.metadata?.cruxFieldData || !insightSetKey) {
+    return null;
+  }
+
+  const insightSet = parsedTrace.insights?.get(insightSetKey);
+  if (!insightSet) {
+    return null;
+  }
+
+  let scope: CrUXManager.Scope|null = null;
+  try {
+    scope = CrUXManager.CrUXManager.instance().getSelectedScope();
+  } catch {
+    // test environment
+  }
+
+  const fieldMetricsResults =
+      Trace.Insights.Common.getFieldMetricsForInsightSet(insightSet, parsedTrace.metadata, scope);
+  if (!fieldMetricsResults) {
+    return null;
+  }
+
+  return fieldMetricsResults;
+}
+
+interface MetricsViewInput {
+  parsedTrace: Trace.TraceModel.ParsedTrace|null;
+  insightSetKey: string|null;
+  didDismissFieldMismatchNotice: boolean;
+  onDismisFieldMismatchNotice: () => void;
+  onClickMetric: (traceEvent: Trace.Types.Events.Event) => void;
+  skipBottomBorder: boolean;
+}
+
+type MetricsView = (input: MetricsViewInput, output: undefined, target: HTMLElement) => void;
+
+const CWV_METRICS_VIEW: MetricsView = (input, _output, target) => {
+  const {
+    parsedTrace,
+    insightSetKey,
+    didDismissFieldMismatchNotice,
+    onDismisFieldMismatchNotice,
+    onClickMetric,
+  } = input;
+
+  const local = getLocalMetrics(parsedTrace, insightSetKey);
+  const field = getFieldMetrics(parsedTrace, insightSetKey);
+
+  const localValues = {
+    lcp: local?.lcp?.value !== undefined ? Trace.Helpers.Timing.microToMilli(local?.lcp.value) : undefined,
+    inp: local?.inp?.value !== undefined ? Trace.Helpers.Timing.microToMilli(local?.inp.value) : undefined,
+  };
+  const fieldValues = field && {
+    lcp: field.lcp?.value !== undefined ? Trace.Helpers.Timing.microToMilli(field.lcp.value) : undefined,
+    inp: field.inp?.value !== undefined ? Trace.Helpers.Timing.microToMilli(field.inp.value) : undefined,
+  };
+  const showFieldMismatchNotice =
+      !didDismissFieldMismatchNotice && !!fieldValues && isFieldWorseThanLocal(localValues, fieldValues);
+
+  function renderMetricValue(
+      metric: 'LCP'|'CLS'|'INP', value: number|null, relevantEvent: Trace.Types.Events.Event|null): Lit.LitTemplate {
+    let valueText: string;
+    let valueDisplay: HTMLElement|string;
+    let classification;
+    if (value === null) {
+      valueText = valueDisplay = '-';
+      classification = Trace.Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification.UNCLASSIFIED;
+    } else if (metric === 'LCP') {
+      const micros = value as Trace.Types.Timing.Micro;
+      const {text, element} = NumberWithUnit.formatMicroSecondsAsSeconds(micros);
+      valueText = text;
+      valueDisplay = element;
+      classification =
+          Trace.Handlers.ModelHandlers.PageLoadMetrics.scoreClassificationForLargestContentfulPaint(micros);
+    } else if (metric === 'CLS') {
+      valueText = valueDisplay = value ? value.toFixed(2) : '0';
+      classification = Trace.Handlers.ModelHandlers.LayoutShifts.scoreClassificationForLayoutShift(value);
+    } else if (metric === 'INP') {
+      const micros = value as Trace.Types.Timing.Micro;
+      const {text, element} = NumberWithUnit.formatMicroSecondsAsMillisFixed(micros);
+      valueText = text;
+      valueDisplay = element;
+      classification =
+          Trace.Handlers.ModelHandlers.UserInteractions.scoreClassificationForInteractionToNextPaint(micros);
+    } else {
+      Platform.TypeScriptUtilities.assertNever(metric, `Unexpected metric ${metric}`);
+    }
+
+    // NOTE: it is deliberate to use the same value for the title and
+    // aria-label; the aria-label is used to give more context to
+    // screen-readers, and the title is to aid users who may not know what
+    // the red/orange/green classification is, or those who are unable to
+    // easily distinguish the visual colour differences.
+    // clang-format off
+    const title = value !== null ?
+      i18nString(UIStrings.metricScore, {PH1: metric, PH2: valueText, PH3: classification}) :
+      i18nString(UIStrings.metricScoreUnavailable, {PH1: metric});
+
+    return html`
+      <button class="metric"
+        @click=${relevantEvent ? onClickMetric.bind(relevantEvent) : null}
+        title=${title}
+        aria-label=${title}
+      >
+        <div class="metric-value metric-value-${classification}">${valueDisplay}</div>
+      </button>
+    `;
+    // clang-format on
+  }
+
+  const lcpEl = renderMetricValue('LCP', local?.lcp?.value ?? null, local?.lcp?.event ?? null);
+  const inpEl = renderMetricValue('INP', local?.inp?.value ?? null, local?.inp?.event ?? null);
+  const clsEl = renderMetricValue('CLS', local?.cls?.value ?? null, local?.cls?.worstClusterEvent ?? null);
+
+  const navigation = parsedTrace?.insights?.get(insightSetKey ?? '')?.navigation;
+  const isSoftNav = navigation && Trace.Types.Events.isSoftNavigationStart(navigation);
+
+  const softNavBadgeTemplate = isSoftNav ? html`
+    <div class="metrics-row soft-nav-badge-row">
+      <span class="badge">SOFT NAV</span>
+    </div>
+  ` :
+                                           Lit.nothing;
+
+  const localMetricsTemplateResult = html`
+    <div class="metrics-row">
+      <span>${lcpEl}</span>
+      <span>${inpEl}</span>
+      <span>${clsEl}</span>
+      <span class="row-label">Local</span>
+    </div>
+    ${!field ? softNavBadgeTemplate : Lit.nothing}
+    ${!field && input.skipBottomBorder ? Lit.nothing : html`<span class="row-border"></span>`}
+  `;
+
+  let fieldMetricsTemplateResult;
+  if (field) {
+    const {lcp, inp, cls} = field;
+
+    const lcpEl = renderMetricValue('LCP', lcp?.value ?? null, null);
+    const inpEl = renderMetricValue('INP', inp?.value ?? null, null);
+    const clsEl = renderMetricValue('CLS', cls?.value ?? null, null);
+
+    let scope = i18nString(UIStrings.originOption);
+    if (lcp?.pageScope === 'url' || inp?.pageScope === 'url') {
+      scope = i18nString(UIStrings.urlOption);
+    }
+
+    // clang-format off
+    fieldMetricsTemplateResult = html`
+      <div class="metrics-row">
+        <span>${lcpEl}</span>
+        <span>${inpEl}</span>
+        <span>${clsEl}</span>
+        <span class="row-label">${i18nString(UIStrings.fieldScoreLabel, {PH1: scope})}</span>
+      </div>
+      ${softNavBadgeTemplate}
+      ${input.skipBottomBorder ? Lit.nothing : html`<span class="row-border"></span>`}
+    `;
+    // clang-format on
+  }
+
+  let fieldIsDifferentEl;
+  if (showFieldMismatchNotice) {
+    // clang-format off
+    fieldIsDifferentEl = html`
+      <div class="field-mismatch-notice" jslog=${VisualLogging.section('timeline.insights.field-mismatch')}>
+        <h3>${i18nString(UIStrings.fieldMismatchTitle)}</h3>
+        <devtools-button
+          title=${i18nString(UIStrings.dismissTitle)}
+          .iconName=${'cross'}
+          .variant=${Buttons.Button.Variant.ICON}
+          .jslogContext=${'timeline.insights.dismiss-field-mismatch'}
+          @click=${onDismisFieldMismatchNotice}
+        ></devtools-button>
+        <div class="field-mismatch-notice__body">${Insights.Helpers.md(i18nString(UIStrings.fieldMismatchNotice))}</div>
+      </div>
+    `;
+    // clang-format on
+  }
+
+  const classes = {metrics: true, 'metrics--field': Boolean(fieldMetricsTemplateResult)};
+  const metricsTableEl = html`<div class=${Lit.Directives.classMap(classes)}>
+    <div class="metrics-row">
+      <span class="metric-label">LCP</span>
+      <span class="metric-label">INP</span>
+      <span class="metric-label">CLS</span>
+      <span class="row-label"></span>
+    </div>
+    ${localMetricsTemplateResult}
+    ${fieldMetricsTemplateResult}
+  </div>`;
+
+  Lit.render(html`
+    <style>${cwvMetricsStyles}</style>
+    <style>${metricValueStyles}</style>
+    ${metricsTableEl}
+    ${fieldIsDifferentEl}
+  `,
+             target);
+};
+
+export interface CWVMetricsData {
+  insightSetKey: Trace.Types.Events.NavigationId|null;
+  parsedTrace: Trace.TraceModel.ParsedTrace|null;
+}
+
+export class CWVMetrics extends UI.Widget.Widget {
+  #view: MetricsView;
+  #data: CWVMetricsData = {
+    insightSetKey: null,
+    parsedTrace: null,
+  };
+
+  #didDismissFieldMismatchNotice = false;
+
+  #skipBottomBorder = false;
+
+  constructor(element?: HTMLElement, view: MetricsView = CWV_METRICS_VIEW) {
+    super(element, {useShadowDom: true});
+    this.#view = view;
+  }
+
+  set data(data: CWVMetricsData) {
+    this.#data = data;
+    this.requestUpdate();
+  }
+
+  get skipBottomBorder(): boolean {
+    return this.#skipBottomBorder;
+  }
+
+  set skipBottomBorder(x: boolean) {
+    if (x === this.#skipBottomBorder) {
+      return;
+    }
+    this.#skipBottomBorder = x;
+    this.requestUpdate();
+  }
+
+  #onClickMetric(traceEvent: Trace.Types.Events.Event): void {
+    this.element.dispatchEvent(new Insights.EventRef.EventReferenceClick(traceEvent));
+  }
+
+  #onDismisFieldMismatchNotice(): void {
+    this.#didDismissFieldMismatchNotice = true;
+    this.requestUpdate();
+  }
+
+  override performUpdate(): void {
+    const {
+      parsedTrace,
+      insightSetKey,
+    } = this.#data;
+
+    if (!parsedTrace?.insights || !insightSetKey || !(parsedTrace.insights instanceof Map)) {
+      return;
+    }
+
+    const insightSet = parsedTrace.insights.get(insightSetKey);
+    if (!insightSet) {
+      return;
+    }
+
+    const input: MetricsViewInput = {
+      parsedTrace,
+      insightSetKey,
+      didDismissFieldMismatchNotice: this.#didDismissFieldMismatchNotice,
+      onDismisFieldMismatchNotice: this.#onDismisFieldMismatchNotice.bind(this),
+      onClickMetric: this.#onClickMetric.bind(this),
+      skipBottomBorder: this.#skipBottomBorder,
+    };
+    this.#view(input, undefined, this.contentElement);
+  }
+}

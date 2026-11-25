@@ -1,0 +1,464 @@
+// Copyright 2020 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import * as Common from '../../core/common/common.js';
+import * as i18n from '../../core/i18n/i18n.js';
+import * as SDK from '../../core/sdk/sdk.js';
+import * as UI from '../../ui/legacy/legacy.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
+
+import type * as Console from './console.js';
+
+const UIStrings = {
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the Command Menu.
+   */
+  preserveLogUponNavigation: 'Keep log on navigation',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the Command Menu.
+   */
+  doNotPreserveLogUponNavigation: 'Don’t keep log on navigation',
+  /**
+   * @description Title of a setting under the Console category in Settings.
+   */
+  customFormatters: 'Custom formatters',
+  /**
+   * @description Title of a setting under the Console category in Settings.
+   */
+  logXmlhttprequests: 'Log XMLHttpRequests',
+  /**
+   * @description Title of the Console tool.
+   */
+  console: 'Console',
+  /**
+   * @description Title of an action that shows the console.
+   */
+  showConsole: 'Show Console',
+  /**
+   * @description Title of an action that toggles the console.
+   */
+  toggleConsole: 'Toggle Console',
+  /**
+   * @description Text to clear the console.
+   */
+  clearConsole: 'Clear console',
+  /**
+   * @description Title of an action in the Console tool to clear.
+   */
+  clearConsoleHistory: 'Clear console history',
+  /**
+   * @description Title of an action in the Console tool to create pin. A live expression is code that the user can enter into the Console and it will be pinned in the UI. Live expressions are constantly evaluated as the user interacts with the Console (hence 'live').
+   */
+  createLiveExpression: 'Create live expression',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the command menu.
+   */
+  networkMessages: 'Network messages',
+  /**
+   * @description Title of an option under the Console category that can be invoked through the command menu.
+   */
+  hideNetworkMessages: 'Hide network messages',
+  /**
+   * @description Title of an option under the Console category that can be invoked through the command menu.
+   */
+  showNetworkMessages: 'Show network messages',
+  /**
+   * @description Alternative title text of a setting in Console view of the Console panel.
+   */
+  selectedContextOnly: 'Selected context only',
+  /**
+   * @description Tooltip text that appears on the setting when hovering over it in Console view of the Console panel.
+   */
+  onlyShowMessagesFromTheCurrent: 'Only show messages from the current context (`top`, `iframe`, `worker`, extension)',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the command menu.
+   */
+  showMessagesFromAllContexts: 'Show messages from all contexts',
+  /**
+   * @description Title of a setting under the Console category.
+   */
+  timestamps: 'Timestamps',
+  /**
+   * @description Title of an option under the Console category that can be invoked through the command menu.
+   */
+  showTimestamps: 'Show timestamps',
+  /**
+   * @description Title of an option under the Console category that can be invoked through the command menu.
+   */
+  hideTimestamps: 'Hide timestamps',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the command menu.
+   */
+  autocompleteFromHistory: 'Autocomplete from history',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the command menu.
+   */
+  doNotAutocompleteFromHistory: 'Don’t autocomplete from history',
+  /**
+   * @description Title of a setting under the Console category that controls whether to accept autocompletion with Enter.
+   */
+  autocompleteOnEnter: 'Accept autocomplete suggestion on Enter',
+  /**
+   * @description Title of a setting under the Console category that controls whether to accept autocompletion with Enter.
+   */
+  doNotAutocompleteOnEnter: 'Don’t accept autocomplete suggestion on Enter',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the command menu.
+   */
+  groupSimilarMessages: 'Group similar messages',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the command menu.
+   */
+  doNotGroupSimilarMessages: 'Don’t group similar messages',
+  /**
+   * @description Title of a setting under the Console category in Settings.
+   */
+  corsErrorsInConsole: 'CORS errors in console',
+  /**
+   * @description Title of an option under the Console category that can be invoked through the command menu.
+   */
+  showCorsErrorsInConsole: 'Show CORS errors in console',
+  /**
+   * @description Title of an option under the Console category that can be invoked through the command menu.
+   */
+  doNotShowCorsErrorsIn: 'Don’t show CORS errors in console',
+  /**
+   * @description Title of a setting under the Console category in Settings.
+   */
+  eagerEvaluation: 'Eager evaluation',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the command menu.
+   */
+  eagerlyEvaluateConsolePromptText: 'Eagerly evaluate Console prompt text',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the command menu.
+   */
+  doNotEagerlyEvaluateConsole: 'Don’t eagerly evaluate Console prompt text',
+  /**
+   * @description Allows code that is executed in the Console to do things that usually are only allowed if triggered by a user action.
+   */
+  evaluateTriggersUserActivation: 'Treat code evaluation as user action',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the command menu.
+   */
+  treatEvaluationAsUserActivation: 'Treat evaluation as user activation',
+  /**
+   * @description Title of a setting under the Console category that can be invoked through the command menu.
+   */
+  doNotTreatEvaluationAsUser: 'Don’t treat evaluation as user activation',
+  /**
+   * @description Title of a setting under the Console category in Settings that controls whether `console.trace()` messages appear expanded by default.
+   */
+  expandConsoleTraceMessagesByDefault: 'Automatically expand `console.trace()` messages',
+  /**
+   * @description Title of a setting under the Console category in Settings that controls whether `console.trace()` messages appear collapsed by default.
+   */
+  collapseConsoleTraceMessagesByDefault: 'Don’t automatically expand `console.trace()` messages',
+  /**
+   * @description Title of a setting under the Console category in Settings that controls whether AI summaries should
+   * be shown for console warnings/errors.
+   */
+  consoleInsightTeasers: 'AI summaries for console messages',
+} as const;
+const str_ = i18n.i18n.registerUIStrings('panels/console/console-meta.ts', UIStrings);
+const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
+let loadedConsoleModule: (typeof Console|undefined);
+
+async function loadConsoleModule(): Promise<typeof Console> {
+  if (!loadedConsoleModule) {
+    loadedConsoleModule = await import('./console.js');
+  }
+  return loadedConsoleModule;
+}
+
+function maybeRetrieveContextTypes<T = unknown>(getClassCallBack: (consoleModule: typeof Console) => T[]): T[] {
+  if (loadedConsoleModule === undefined) {
+    return [];
+  }
+  return getClassCallBack(loadedConsoleModule);
+}
+
+UI.ViewManager.registerViewExtension({
+  location: UI.ViewManager.ViewLocationValues.PANEL,
+  id: 'console',
+  title: i18nLazyString(UIStrings.console),
+  commandPrompt: i18nLazyString(UIStrings.showConsole),
+  order: 20,
+  async loadView() {
+    const Console = await loadConsoleModule();
+    return Console.ConsolePanel.ConsolePanel.instance();
+  },
+});
+
+UI.ViewManager.registerViewExtension({
+  location: UI.ViewManager.ViewLocationValues.DRAWER_VIEW,
+  id: 'console-view',
+  title: i18nLazyString(UIStrings.console),
+  commandPrompt: i18nLazyString(UIStrings.showConsole),
+  persistence: UI.ViewManager.ViewPersistence.PERMANENT,
+  order: 0,
+  async loadView() {
+    const Console = await loadConsoleModule();
+    return Console.ConsolePanel.WrapperView.instance();
+  },
+});
+
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'console.toggle',
+  category: UI.ActionRegistration.ActionCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.toggleConsole),
+  async loadActionDelegate() {
+    const Console = await loadConsoleModule();
+    return new Console.ConsoleView.ActionDelegate();
+  },
+  bindings: [
+    {
+      shortcut: 'Ctrl+`',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.DEVTOOLS_DEFAULT,
+        UI.ActionRegistration.KeybindSet.VS_CODE,
+      ],
+      // The Cmd+` combination is used in macOS to activate the next
+      // open window in the front app. Therefore it was not implemented
+      // below.
+    },
+  ],
+});
+
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'console.clear',
+  category: UI.ActionRegistration.ActionCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.clearConsole),
+  iconClass: UI.ActionRegistration.IconClass.CLEAR,
+  async loadActionDelegate() {
+    const Console = await loadConsoleModule();
+    return new Console.ConsoleView.ActionDelegate();
+  },
+  contextTypes() {
+    return maybeRetrieveContextTypes(Console => [Console.ConsoleView.ConsoleView]);
+  },
+  bindings: [
+    {
+      shortcut: 'Ctrl+L',
+    },
+    {
+      shortcut: 'Meta+K',
+      platform: UI.ActionRegistration.Platforms.MAC,
+    },
+  ],
+});
+
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'console.clear.history',
+  category: UI.ActionRegistration.ActionCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.clearConsoleHistory),
+  async loadActionDelegate() {
+    const Console = await loadConsoleModule();
+    return new Console.ConsoleView.ActionDelegate();
+  },
+});
+
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'console.create-pin',
+  category: UI.ActionRegistration.ActionCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.createLiveExpression),
+  iconClass: UI.ActionRegistration.IconClass.EYE,
+  async loadActionDelegate() {
+    const Console = await loadConsoleModule();
+    return new Console.ConsoleView.ActionDelegate();
+  },
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ConsoleSettings.networkMessagesSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.networkMessages),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.showNetworkMessages),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.hideNetworkMessages),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ConsoleSettings.selectedContextFilterEnabledSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.selectedContextOnly),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.onlyShowMessagesFromTheCurrent),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.showMessagesFromAllContexts),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ConsoleSettings.consoleTimestampsEnabledSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.timestamps),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.showTimestamps),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.hideTimestamps),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ConsoleSettings.consoleHistoryAutocompleteSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.autocompleteFromHistory),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.autocompleteFromHistory),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotAutocompleteFromHistory),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ConsoleSettings.consoleAutocompleteOnEnterSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.autocompleteOnEnter),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.autocompleteOnEnter),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotAutocompleteOnEnter),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ConsoleSettings.consoleGroupSimilarSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.groupSimilarMessages),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.groupSimilarMessages),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotGroupSimilarMessages),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ConsoleSettings.consoleShowsCorsErrorsSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.corsErrorsInConsole),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.showCorsErrorsInConsole),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotShowCorsErrorsIn),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ConsoleSettings.consoleEagerEvalSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.eagerEvaluation),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.eagerlyEvaluateConsolePromptText),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotEagerlyEvaluateConsole),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.consoleUserActivationEvalSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.evaluateTriggersUserActivation),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.treatEvaluationAsUserActivation),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotTreatEvaluationAsUser),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ConsoleSettings.consoleTraceExpandSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.expandConsoleTraceMessagesByDefault),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.expandConsoleTraceMessagesByDefault),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.collapseConsoleTraceMessagesByDefault),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ConsoleSettings.consoleInsightTeasersEnabledSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.consoleInsightTeasers),
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.preserveConsoleLogSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.preserveLogUponNavigation),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.preserveLogUponNavigation),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotPreserveLogUponNavigation),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.customFormattersSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.customFormatters),
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.monitoringXHREnabledSettingDescriptor, {
+  category: Common.Settings.SettingCategory.CONSOLE,
+  title: i18nLazyString(UIStrings.logXmlhttprequests),
+});
+
+Common.Revealer.registerRevealer({
+  contextTypes() {
+    return [
+      Common.Console.Console,
+    ];
+  },
+  destination: undefined,
+  async loadRevealer() {
+    const Console = await loadConsoleModule();
+    return new Console.ConsolePanel.ConsoleRevealer();
+  },
+});

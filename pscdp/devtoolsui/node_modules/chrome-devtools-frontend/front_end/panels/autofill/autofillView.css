@@ -1,0 +1,91 @@
+/*
+ * Copyright 2023 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+@scope to (devtools-widget > *) {
+  main {
+    height: 100%;
+    overflow: auto;
+  }
+
+  .header {
+    display: flex;
+    flex-wrap: wrap;
+    border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
+    width: 100%;
+  }
+
+  .placeholder-container {
+    height: calc(100% - 29px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: auto;
+  }
+
+  .address {
+    padding: 10px;
+    border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
+  }
+
+  .filled-fields-grid {
+    border-top: var(--sys-size-1) solid var(--sys-color-divider);
+    box-sizing: border-box;
+  }
+
+  .content-container {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+    overflow: auto;
+  }
+
+  .grid-wrapper {
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  devtools-data-grid {
+    border: none;
+    height: 100%;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+  }
+
+  .label-container {
+    padding: 5px;
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .top-left-corner {
+    border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
+    display: flex;
+    flex-wrap: wrap;
+    padding: 5px;
+    gap: 10px;
+  }
+
+  .matches-filled-field {
+    background-color: var(--sys-color-tonal-container);
+  }
+
+  .highlighted {
+    background-color: var(--sys-color-state-focus-select);
+  }
+
+  .link {
+    color: var(--sys-color-primary);
+    text-decoration-line: underline;
+  }
+
+  .feedback {
+    margin: auto 5px auto auto;
+    font-size: var(--sys-typescale-body4-size);
+  }
+}

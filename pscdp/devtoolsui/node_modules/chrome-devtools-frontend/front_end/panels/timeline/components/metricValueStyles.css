@@ -1,0 +1,58 @@
+/*
+ * Copyright 2024 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+.metric-value {
+  text-wrap: nowrap;
+}
+
+.metric-value.dim {
+  font-weight: var(--ref-typeface-weight-medium);
+}
+
+.metric-value.waiting {
+  color: var(--sys-color-token-subtle);
+}
+
+.metric-value.good {
+  color: var(--app-color-performance-good);
+}
+
+.metric-value.needs-improvement {
+  color: var(--app-color-performance-ok);
+}
+
+.metric-value.poor {
+  color: var(--app-color-performance-bad);
+}
+
+.metric-value.good.dim {
+  color: var(--app-color-performance-good-dim);
+}
+
+.metric-value.needs-improvement.dim {
+  color: var(--app-color-performance-ok-dim);
+}
+
+.metric-value.poor.dim {
+  color: var(--app-color-performance-bad-dim);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  height: var(--sys-size-8);
+  border-radius: var(--sys-shape-corner-extra-small);
+  padding: 0 var(--sys-size-3);
+  border: var(--sys-size-1) solid var(--sys-color-primary);
+  color: var(--sys-color-primary);
+  font-weight: var(--ref-typeface-weight-bold);
+  font-size: var(--sys-size-5);
+  text-align: center;
+  margin-top: var(--sys-size-5);
+  margin-bottom: var(--sys-size-5);
+}

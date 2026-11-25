@@ -1,0 +1,188 @@
+// Copyright 2023 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import type * as Common from '../../core/common/common.js';
+import * as i18n from '../../core/i18n/i18n.js';
+import type * as Platform from '../../core/platform/platform.js';
+import * as SDK from '../../core/sdk/sdk.js';
+import type * as Protocol from '../../generated/protocol.js';
+import {createIcon} from '../../ui/kit/kit.js';
+
+import {IndexedDBTreeElement} from './ApplicationPanelSidebar.js';
+import {ExpandableApplicationPanelTreeElement} from './ApplicationPanelTreeElement.js';
+import {StorageMetadataView} from './components/components.js';
+import type {ResourcesPanel} from './ResourcesPanel.js';
+import {ServiceWorkerCacheTreeElement} from './ServiceWorkerCacheTreeElement.js';
+
+const UIStrings = {
+  /**
+   * @description Label for the storage buckets tree element in the Application panel sidebar.
+   */
+  storageBuckets: 'Storage buckets',
+  /**
+   * @description Empty state title in the Application panel when no storage buckets are detected.
+   */
+  noStorageBuckets: 'No storage buckets detected',
+  /**
+   * @description Empty state description in the Application panel describing the storage buckets view.
+   */
+  storageBucketsDescription:
+      'On this page you can view and delete storage buckets, and their associated `Storage APIs`',
+} as const;
+const str_ = i18n.i18n.registerUIStrings('panels/application/StorageBucketsTreeElement.ts', UIStrings);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
+export class StorageBucketsTreeParentElement extends ExpandableApplicationPanelTreeElement {
+  private bucketTreeElements = new Set<StorageBucketsTreeElement>();
+
+  constructor(storagePanel: ResourcesPanel) {
+    super(storagePanel, i18nString(UIStrings.storageBuckets), i18nString(UIStrings.noStorageBuckets),
+          i18nString(UIStrings.storageBucketsDescription), 'storage-buckets');
+    const icon = createIcon('bucket');
+    this.setLeadingIcons([icon]);
+    this.setLink('https://github.com/WICG/storage-buckets/blob/gh-pages/explainer.md' as
+                 Platform.DevToolsPath.UrlString);
+  }
+
+  initialize(): void {
+    SDK.TargetManager.TargetManager.instance().addModelListener(SDK.StorageBucketsModel.StorageBucketsModel,
+                                                                SDK.StorageBucketsModel.Events.BUCKET_ADDED,
+                                                                this.bucketAdded, this);
+    SDK.TargetManager.TargetManager.instance().addModelListener(SDK.StorageBucketsModel.StorageBucketsModel,
+                                                                SDK.StorageBucketsModel.Events.BUCKET_REMOVED,
+                                                                this.bucketRemoved, this);
+    SDK.TargetManager.TargetManager.instance().addModelListener(SDK.StorageBucketsModel.StorageBucketsModel,
+                                                                SDK.StorageBucketsModel.Events.BUCKET_CHANGED,
+                                                                this.bucketChanged, this);
+
+    for (const bucketsModel of SDK.TargetManager.TargetManager.instance().models(
+             SDK.StorageBucketsModel.StorageBucketsModel)) {
+      const buckets = bucketsModel.getBuckets();
+      for (const bucket of buckets) {
+        this.addBucketTreeElement(bucketsModel, bucket);
+      }
+    }
+  }
+
+  removeBucketsForModel(model: SDK.StorageBucketsModel.StorageBucketsModel): void {
+    for (const bucketTreeElement of this.bucketTreeElements) {
+      if (bucketTreeElement.model === model) {
+        this.removeBucketTreeElement(bucketTreeElement);
+      }
+    }
+  }
+
+  private bucketAdded({data: {model, bucketInfo}}:
+                          Common.EventTarget.EventTargetEvent<SDK.StorageBucketsModel.BucketEvent>): void {
+    this.addBucketTreeElement(model, bucketInfo);
+  }
+
+  private bucketRemoved({data: {model, bucketInfo}}:
+                            Common.EventTarget.EventTargetEvent<SDK.StorageBucketsModel.BucketEvent>): void {
+    const idbDatabaseTreeElement = this.getBucketTreeElement(model, bucketInfo);
+    if (!idbDatabaseTreeElement) {
+      return;
+    }
+    this.removeBucketTreeElement(idbDatabaseTreeElement);
+  }
+
+  private bucketChanged({data: {model, bucketInfo}}:
+                            Common.EventTarget.EventTargetEvent<SDK.StorageBucketsModel.BucketEvent>): void {
+    const idbDatabaseTreeElement = this.getBucketTreeElement(model, bucketInfo);
+    if (!idbDatabaseTreeElement) {
+      return;
+    }
+    idbDatabaseTreeElement.bucketInfo = bucketInfo;
+  }
+
+  private addBucketTreeElement(model: SDK.StorageBucketsModel.StorageBucketsModel,
+                               bucketInfo: Protocol.Storage.StorageBucketInfo): void {
+    if (bucketInfo.bucket.name === undefined) {
+      return;
+    }
+    const singleBucketTreeElement = new StorageBucketsTreeElement(this.resourcesPanel, model, bucketInfo);
+    this.bucketTreeElements.add(singleBucketTreeElement);
+    this.appendChild(singleBucketTreeElement);
+    singleBucketTreeElement.initialize();
+  }
+
+  private removeBucketTreeElement(bucketTreeElement: StorageBucketsTreeElement): void {
+    this.removeChild(bucketTreeElement);
+    this.bucketTreeElements.delete(bucketTreeElement);
+    this.setExpandable(this.bucketTreeElements.size > 0);
+  }
+
+  override get itemURL(): Platform.DevToolsPath.UrlString {
+    return 'storage-buckets-group://' as Platform.DevToolsPath.UrlString;
+  }
+
+  getBucketTreeElement(model: SDK.StorageBucketsModel.StorageBucketsModel, {
+    bucket: {storageKey, name},
+  }: Protocol.Storage.StorageBucketInfo): StorageBucketsTreeElement|null {
+    for (const bucketTreeElement of this.bucketTreeElements) {
+      if (bucketTreeElement.model === model && bucketTreeElement.bucketInfo.bucket.storageKey === storageKey &&
+          bucketTreeElement.bucketInfo.bucket.name === name) {
+        return bucketTreeElement;
+      }
+    }
+    return null;
+  }
+}
+
+export class StorageBucketsTreeElement extends ExpandableApplicationPanelTreeElement {
+  private storageBucketInfo: Protocol.Storage.StorageBucketInfo;
+  private bucketModel: SDK.StorageBucketsModel.StorageBucketsModel;
+  private view?: StorageMetadataView.StorageMetadataView;
+
+  constructor(resourcesPanel: ResourcesPanel, model: SDK.StorageBucketsModel.StorageBucketsModel,
+              bucketInfo: Protocol.Storage.StorageBucketInfo) {
+    const {bucket} = bucketInfo;
+    const {origin} = SDK.StorageKeyManager.parseStorageKey(bucketInfo.bucket.storageKey);
+    super(resourcesPanel, `${bucket.name} - ${origin}`, '', '', 'storage-bucket');
+    this.bucketModel = model;
+    this.storageBucketInfo = bucketInfo;
+    const icon = createIcon('database');
+    this.setLeadingIcons([icon]);
+  }
+
+  initialize(): void {
+    const {bucket} = this.bucketInfo;
+    const indexedDBTreeElement = new IndexedDBTreeElement(this.resourcesPanel, bucket);
+    this.appendChild(indexedDBTreeElement);
+    const serviceWorkerCacheTreeElement = new ServiceWorkerCacheTreeElement(this.resourcesPanel, bucket);
+    this.appendChild(serviceWorkerCacheTreeElement);
+    serviceWorkerCacheTreeElement.initialize();
+  }
+
+  override get itemURL(): Platform.DevToolsPath.UrlString {
+    const {bucket} = this.bucketInfo;
+    return `storage-buckets-group://${bucket.name}/${bucket.storageKey}` as Platform.DevToolsPath.UrlString;
+  }
+
+  get model(): SDK.StorageBucketsModel.StorageBucketsModel {
+    return this.bucketModel;
+  }
+
+  get bucketInfo(): Protocol.Storage.StorageBucketInfo {
+    return this.storageBucketInfo;
+  }
+
+  set bucketInfo(bucketInfo: Protocol.Storage.StorageBucketInfo) {
+    this.storageBucketInfo = bucketInfo;
+    if (this.view) {
+      this.view.storageBucket = this.storageBucketInfo;
+    }
+  }
+
+  override onselect(selectedByUser?: boolean): boolean {
+    super.onselect(selectedByUser);
+    if (!this.view) {
+      this.view = new StorageMetadataView.StorageMetadataView();
+      this.view.enableStorageBucketControls(this.model);
+      this.view.storageBucket = this.storageBucketInfo;
+    }
+    this.showView(this.view);
+    return false;
+  }
+}

@@ -1,0 +1,48 @@
+/*
+ * Copyright 2020 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+:host {
+  overflow: auto;
+}
+
+.inline-name {
+  color: var(--sys-color-state-disabled);
+  padding-left: 2ex;
+  user-select: none;
+  white-space: pre-line;
+}
+
+.inline-name::after {
+  content: ":\A0";
+}
+
+.inline-comment {
+  color: var(--sys-color-token-subtle);
+  padding-left: 1ex;
+  white-space: pre-line;
+}
+
+.inline-comment::before {
+  content: "(";
+}
+
+.inline-comment::after {
+  content: ")";
+}
+
+.icon-link.devtools-link {
+  background-color: var(--sys-color-primary);
+  vertical-align: sub;
+}
+
+.frame-details-report-container {
+  min-width: 550px;
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

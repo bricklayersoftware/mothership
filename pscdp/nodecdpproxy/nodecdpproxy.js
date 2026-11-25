@@ -174,7 +174,7 @@ function processIncommingMsg(messageEvent) {
     let isbase64 = result['isbase64']
 
     if ( ! ischunked ) {
-        pbmessages[resultid] = result;
+        pbmessages[String(resultid)] = result;
     } else {
         let chunk = {
             "imagedata":payload['imagedata'],
@@ -184,13 +184,13 @@ function processIncommingMsg(messageEvent) {
             "remainderlength":payload['remainderlength']
         };
 
-        let pbmsg = pbmessages[resultid];
+        let pbmsg = pbmessages[String(resultid)];
 
         if ( ! pbmsg ) {
             pbmsg = result;
 
             pbmsg['chunkobj'] = [ chunk ]; 
-            pbmessages[resultid] = pbmsg;
+            pbmessages[String(resultid)] = pbmsg;
         } else {
             pbmsg['chunkobj'].push(chunk);
         }
@@ -204,14 +204,20 @@ function processIncommingMsg(messageEvent) {
         }
     }
     
-    pbmsg = pbmessages[resultid];
+    pbmsg = pbmessages[String(resultid)];
     payload = pbmsg['result'];
 
     if ( pbmsg['isbase64'] ) {
         payload = Buffer.from(payload, 'base64').toString('utf8');
     }
 
-    
+    logmsg('payload: ', payload);
+
+    if ( wss.clients.size == 0 ) {
+        logmsg('no connected clients -- skipping');
+        return;
+    }
+
     wss.clients.forEach((client) => {
         if (client.readyState === 1) { // 1 = WebSocket.OPEN
             client.send(payload);
@@ -229,7 +235,11 @@ wss.on('connection', (ws) => {
     ws.on('message', async (rawData) => {
 
         try {
-            const base64String = Buffer.from(rawData).toString('base64');
+            const base64String = Buffer.from(rawData).toString('utf8');
+
+            logmsg('incomming message: '+base64String);
+            
+            return;
 
             let payload = {
 

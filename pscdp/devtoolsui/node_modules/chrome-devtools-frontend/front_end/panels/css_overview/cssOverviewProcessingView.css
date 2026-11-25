@@ -1,0 +1,29 @@
+/**
+ * Copyright 2019 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+.overview-processing-view {
+  overflow: hidden;
+  padding: var(--sys-size-8);
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+.overview-processing-view h1 {
+  font-size: var(--sys-typescale-body1-size);
+  text-align: center;
+  font-weight: normal;
+  margin: 0;
+  padding: var(--sys-size-5);
+}
+
+.overview-processing-view h2 {
+  font-size: var(--sys-typescale-body4-size);
+  text-align: center;
+  font-weight: normal;
+  margin: 0;
+  padding-top: var(--sys-size-13);
+}

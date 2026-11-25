@@ -1,0 +1,1205 @@
+// Copyright 2021 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+/* eslint-disable @devtools/no-imperative-dom-api */
+
+/*
+ * Copyright (C) 2008 Apple Inc.  All rights reserved.
+ * Copyright (C) 2011 Google Inc.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1.  Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ * 2.  Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ *     its contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+import * as Common from '../../core/common/common.js';
+import * as Platform from '../../core/platform/platform.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
+import * as VisualLogging from '../visual_logging/visual_logging.js';
+
+import * as ARIAUtils from './ARIAUtils.js';
+import {appendStyle, rangeOfWord} from './DOMUtilities.js';
+import {SuggestBox, type SuggestBoxDelegate, type Suggestion} from './SuggestBox.js';
+import textPromptStyles from './textPrompt.css.js';
+import {Tooltip} from './Tooltip.js';
+import {cloneCustomElement, ElementFocusRestorer} from './UIUtils.js';
+
+/**
+ * A custom element wrapper around TextPrompt that allows text-editing contents in-place.
+ *
+ * ## Usage ##
+ *
+ * ```
+ * <devtools-prompt>
+ *  <b>Structured</b> content
+ * </devtools-prompt>
+ *
+ * ```
+ *
+ * @property completionTimeout Sets the delay for showing the autocomplete suggestion box.
+ * @event commit Editing is done and the result was accepted.
+ * @event cancel Editing was canceled.
+ * @event beforeautocomplete This is sent before the autocomplete suggestion box is triggered and before the <datalist>
+ *                           is read.
+ * @attribute editing Setting/removing this attribute starts/stops editing.
+ * @attribute completions Sets the `id` of the <datalist> containing the autocomplete options.
+ * @attribute placeholder Sets a placeholder that's shown in place of the text contents when editing if the text is too
+ *            large.
+ * @attribute value Sets the initial text value that's edited when editing starts. If not provided, the slot's inner text is used.
+ */
+export class TextPromptElement extends HTMLElement {
+  static readonly observedAttributes: string[] =
+      ['editing', 'completions', 'placeholder', 'cancel-on-blur', 'render-as-block'];
+  static formAssociated = true;
+  readonly #shadow = this.attachShadow({mode: 'open'});
+  readonly #internals = this.attachInternals();
+  readonly #entrypoint = this.#shadow.createChild('span');
+  readonly #slot = this.#entrypoint.createChild('slot');
+  readonly #textPrompt = new TextPrompt();
+  #completionTimeout: number|null = null;
+  #completionObserver = new MutationObserver(this.#onMutate.bind(this));
+  #validator?: (value: string) => null | Platform.UIString.LocalizedString;
+  #cancelOnBlur = false;
+  #isEditing = false;
+
+  constructor() {
+    super();
+    this.#textPrompt.initialize(this.#willAutoComplete.bind(this));
+  }
+
+  set validator(v: (value: string) => (null | Platform.UIString.LocalizedString)) {
+    this.#validator = v;
+  }
+
+  get validator(): undefined|((value: string) => (null | Platform.UIString.LocalizedString)) {
+    return this.#validator;
+  }
+
+  set cancelOnBlur(cancelOnBlur: boolean) {
+    this.setAttribute('cancel-on-blur', `${cancelOnBlur}`);
+  }
+
+  get cancelOnBlur(): boolean {
+    return this.#cancelOnBlur;
+  }
+
+  set renderAsBlock(renderAsBlock: boolean) {
+    if (renderAsBlock) {
+      this.setAttribute('render-as-block', '');
+    } else {
+      this.removeAttribute('render-as-block');
+    }
+  }
+
+  get renderAsBlock(): boolean {
+    return this.hasAttribute('render-as-block');
+  }
+
+  #onMutate(changes: MutationRecord[]): void {
+    const listId = this.getAttribute('completions');
+    if (!listId) {
+      return;
+    }
+    const checkIfNodeIsInCompletionList = (node: Node): boolean => {
+      if (node instanceof HTMLDataListElement) {
+        return node.id === listId;
+      }
+      if (node instanceof HTMLOptionElement) {
+        return Boolean(node.parentElement && checkIfNodeIsInCompletionList(node.parentElement));
+      }
+      return false;
+    };
+    const affectsCompletionList = (change: MutationRecord): boolean =>
+        change.addedNodes.values().some(checkIfNodeIsInCompletionList) ||
+        change.removedNodes.values().some(checkIfNodeIsInCompletionList) ||
+        checkIfNodeIsInCompletionList(change.target);
+
+    if (changes.some(affectsCompletionList)) {
+      this.#updateCompletions();
+    }
+  }
+  attributeChangedCallback(name: string, oldValue: string|null, newValue: string|null): void {
+    if (oldValue === newValue) {
+      return;
+    }
+
+    const isTruthy = (value: string|null): boolean => value !== null && value !== 'false';
+
+    switch (name) {
+      case 'cancel-on-blur':
+        if (isTruthy(newValue)) {
+          this.#cancelOnBlur = true;
+        } else {
+          this.#cancelOnBlur = false;
+        }
+        break;
+      case 'editing':
+        if (this.isConnected) {
+          if (isTruthy(newValue)) {
+            if (!isTruthy(oldValue)) {
+              this.#startEditing();
+            }
+          } else {
+            this.#stopEditing();
+          }
+        }
+        break;
+      case 'completions':
+        if (this.getAttribute('completions')) {
+          this.#completionObserver.observe(this, {childList: true, subtree: true});
+          this.#updateCompletions();
+        } else {
+          this.#textPrompt.clearAutocomplete();
+          this.#completionObserver.disconnect();
+        }
+        break;
+      case 'render-as-block':
+        if (this.#isEditing) {
+          if (isTruthy(newValue)) {
+            this.#textPrompt.renderAsBlock();
+            this.#entrypoint.style.display = 'block';
+          } else {
+            this.#textPrompt.renderAsInlineBlock();
+            this.#entrypoint.style.display = 'inline';
+          }
+        }
+        break;
+    }
+  }
+
+  #updateCompletions(): void {
+    if (this.isConnected && this.#isEditing) {
+      void this.#textPrompt.complete(/* force=*/ true);
+    }
+  }
+
+  async #willAutoComplete(expression: string, filter: string, force: boolean): Promise<Suggestion[]> {
+    this.dispatchEvent(new TextPromptElement.BeforeAutoCompleteEvent({expression, filter, force}));
+
+    const listId = this.getAttribute('completions');
+    if (!listId) {
+      return [];
+    }
+
+    const datalist = this.getComponentRoot()?.querySelectorAll<HTMLOptionElement>(`datalist#${listId} > option`);
+    if (!datalist?.length) {
+      return [];
+    }
+
+    return datalist.values()
+        .filter(option => option.textContent.startsWith(filter.toLowerCase()))
+        .map(option => ({text: option.textContent}))
+        .toArray();
+  }
+
+  #startEditing(): void {
+    this.#isEditing = true;
+    const truncatedTextPlaceholder = this.getAttribute('placeholder');
+    const placeholder = this.#entrypoint.createChild('span');
+    const initialText = this.getAttribute('value') ?? this.#slot.deepInnerText();
+    if (truncatedTextPlaceholder === null) {
+      placeholder.textContent = initialText;
+    } else {
+      placeholder.setTextContentTruncatedIfNeeded(initialText, truncatedTextPlaceholder);
+    }
+    this.#slot.remove();
+
+    if (this.renderAsBlock) {
+      this.#textPrompt.renderAsBlock();
+      this.#entrypoint.style.display = 'block';
+    } else {
+      this.#textPrompt.renderAsInlineBlock();
+      this.#entrypoint.style.display = 'inline';
+    }
+    const proxy =
+        this.#textPrompt.attachAndStartEditing(placeholder, e => this.#done(e, /* commit=*/ !this.#cancelOnBlur));
+    proxy.addEventListener('keydown', this.#editingValueKeyDown.bind(this));
+    this.#textPrompt.selectAll();
+    this.#textPrompt.focus();
+  }
+
+  #stopEditing(): void {
+    this.#isEditing = false;
+    this.#entrypoint.removeChildren();
+    this.#entrypoint.appendChild(this.#slot);
+    this.#textPrompt.detach();
+  }
+
+  connectedCallback(): void {
+    if (this.hasAttribute('editing')) {
+      this.attributeChangedCallback('editing', null, '');
+    }
+  }
+
+  disconnectedCallback(): void {
+    if (this.hasAttribute('editing')) {
+      this.#stopEditing();
+    }
+  }
+
+  #done(e: Event, commit: boolean): void {
+    if (!this.#isEditing) {
+      return;
+    }
+    const target = e.target as HTMLElement;
+    const text = target.textContent || '';
+    if (commit) {
+      const validationMessage = this.#validator?.(text) ?? '';
+      if (validationMessage) {
+        this.#internals.setValidity({customError: true}, validationMessage, this.#entrypoint);
+      } else {
+        this.#internals.setValidity({});
+      }
+
+      if (!this.#internals.reportValidity()) {
+        return;
+      }
+
+      this.#isEditing = false;
+      this.dispatchEvent(new TextPromptElement.CommitEvent(text));
+    } else {
+      this.#internals.setValidity({});
+      this.#isEditing = false;
+      this.dispatchEvent(new TextPromptElement.CancelEvent());
+    }
+    e.consume();
+  }
+
+  #editingValueKeyDown(event: Event): void {
+    if (event.handled || !(event instanceof KeyboardEvent)) {
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      this.#done(event, /* commit=*/ true);
+    } else if (Platform.KeyboardUtilities.isEscKey(event)) {
+      this.#done(event, /* commit=*/ false);
+    } else {
+      this.#internals.setValidity({});
+    }
+  }
+
+  set completionTimeout(timeout: number) {
+    this.#completionTimeout = timeout;
+    this.#textPrompt.setAutocompletionTimeout(timeout);
+  }
+
+  override cloneNode(): Node {
+    const clone = cloneCustomElement(this);
+    if (this.#completionTimeout !== null) {
+      clone.completionTimeout = this.#completionTimeout;
+    }
+    return clone;
+  }
+}
+
+export namespace TextPromptElement {
+  export class CommitEvent extends CustomEvent<string> {
+    constructor(detail: string) {
+      super('commit', {detail});
+    }
+  }
+  export class CancelEvent extends CustomEvent<void> {
+    constructor() {
+      super('cancel');
+    }
+  }
+  export class BeforeAutoCompleteEvent extends CustomEvent<{expression: string, filter: string, force: boolean}> {
+    constructor(detail: {expression: string, filter: string, force: boolean}) {
+      super('beforeautocomplete', {detail});
+    }
+  }
+}
+
+customElements.define('devtools-prompt', TextPromptElement);
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'devtools-prompt': TextPromptElement;
+  }
+}
+
+export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements SuggestBoxDelegate {
+  private proxyElement!: HTMLElement|undefined;
+  private proxyElementDisplay: string;
+  private autocompletionTimeout: number;
+  #title: string;
+  protected queryRange: TextUtils.TextRange.TextRange|null;
+  private previousText: string;
+  #currentSuggestion: Suggestion|null;
+  private completionRequestId: number;
+  private ghostTextElement: HTMLSpanElement;
+  private leftParenthesesIndices: number[];
+  private loadCompletions?: (
+      this: null,
+      arg1: string,
+      arg2: string,
+      arg3: boolean,
+      ) => Promise<Suggestion[]>;
+  private completionStopCharacters!: string;
+  private usesSuggestionBuilder!: boolean;
+  #element?: Element;
+  #ariaPlaceholder: string|null = null;
+  #ariaLabelFromPlaceholder = false;
+  private boundOnKeyDown?: ((ev: KeyboardEvent) => void);
+  #boundSaveSelection?: (() => void);
+  #boundOnFocusIn?: (() => void);
+  private boundOnInput?: ((ev: Event) => void);
+  private boundOnMouseWheel?: ((event: Event) => void);
+  private boundClearAutocomplete?: (() => void);
+  private boundOnBlur?: ((ev: Event) => void);
+  private contentElement?: HTMLElement;
+  protected suggestBox?: SuggestBox;
+  private isEditing?: boolean;
+  private focusRestorer?: ElementFocusRestorer;
+  private blurListener?: ((arg0: Event) => void);
+  private oldTabIndex?: number;
+  private completeTimeout?: number;
+  #disableDefaultSuggestionForEmptyInput?: boolean;
+  #savedSelection: {anchorColumn: number, focusColumn: number}|null = null;
+  jslogContext: string|undefined = undefined;
+
+  constructor() {
+    super();
+    this.proxyElementDisplay = 'inline-block';
+    this.autocompletionTimeout = DefaultAutocompletionTimeout;
+    this.#title = '';
+    this.queryRange = null;
+    this.previousText = '';
+    this.#currentSuggestion = null;
+    this.completionRequestId = 0;
+    this.ghostTextElement = document.createElement('span');
+    this.ghostTextElement.classList.add('auto-complete-text');
+    this.ghostTextElement.setAttribute('contenteditable', 'false');
+    this.leftParenthesesIndices = [];
+    ARIAUtils.setHidden(this.ghostTextElement, true);
+  }
+
+  initialize(
+      completions: (this: null, expression: string, filter: string, force: boolean) => Promise<Suggestion[]>,
+      stopCharacters?: string, usesSuggestionBuilder?: boolean): void {
+    this.loadCompletions = completions;
+    this.completionStopCharacters = stopCharacters || ' =:[({;,!+-*/&|^<>.';
+    this.usesSuggestionBuilder = usesSuggestionBuilder || false;
+    this.#updateAriaRole();
+  }
+
+  #updateAriaRole(): void {
+    if (!this.#element) {
+      return;
+    }
+    if (this.loadCompletions) {
+      ARIAUtils.markAsCombobox(this.#element);
+      ARIAUtils.setAutocomplete(this.#element, ARIAUtils.AutocompleteInteractionModel.BOTH);
+      ARIAUtils.setHasPopup(this.#element, ARIAUtils.PopupRole.LIST_BOX);
+      ARIAUtils.setExpanded(this.#element, this.isSuggestBoxVisible());
+      ARIAUtils.setPlaceholder(this.#element, null);
+      if (this.#ariaPlaceholder && (!this.#element.hasAttribute('aria-label') || this.#ariaLabelFromPlaceholder)) {
+        ARIAUtils.setLabel(this.#element, this.#ariaPlaceholder);
+        this.#ariaLabelFromPlaceholder = true;
+      }
+    } else {
+      ARIAUtils.markAsTextBox(this.#element);
+      ARIAUtils.clearAutocomplete(this.#element);
+      ARIAUtils.setHasPopup(this.#element, ARIAUtils.PopupRole.FALSE);
+      ARIAUtils.unsetExpandable(this.#element);
+      ARIAUtils.setPlaceholder(this.#element, this.#ariaPlaceholder);
+    }
+  }
+
+  setAutocompletionTimeout(timeout: number): void {
+    this.autocompletionTimeout = timeout;
+  }
+
+  renderAsBlock(): void {
+    this.proxyElementDisplay = 'block';
+    if (this.proxyElement) {
+      (this.proxyElement as HTMLElement).style.display = 'block';
+    }
+  }
+
+  renderAsInlineBlock(): void {
+    this.proxyElementDisplay = 'inline-block';
+    if (this.proxyElement) {
+      (this.proxyElement as HTMLElement).style.display = 'inline-block';
+    }
+  }
+
+  /**
+   * Clients should never attach any event listeners to the |element|. Instead,
+   * they should use the result of this method to attach listeners for bubbling events.
+   */
+  attach(element: Element): Element {
+    return this.#attach(element);
+  }
+
+  /**
+   * Clients should never attach any event listeners to the |element|. Instead,
+   * they should use the result of this method to attach listeners for bubbling events
+   * or the |blurListener| parameter to register a "blur" event listener on the |element|
+   * (since the "blur" event does not bubble.)
+   */
+  attachAndStartEditing(element: Element, blurListener?: (arg0: Event) => void): Element {
+    const proxyElement = this.#attach(element);
+    this.startEditing(blurListener);
+    return proxyElement;
+  }
+
+  #attach(element: Element): Element {
+    if (this.proxyElement) {
+      throw new Error('Cannot attach an attached TextPrompt');
+    }
+    this.#element = element;
+
+    this.boundOnKeyDown = this.onKeyDown.bind(this);
+    this.#boundSaveSelection = this.#saveSelection.bind(this);
+    this.#boundOnFocusIn = this.#onFocusIn.bind(this);
+    this.boundOnInput = this.onInput.bind(this);
+    this.boundOnMouseWheel = this.onMouseWheel.bind(this);
+    this.boundClearAutocomplete = this.clearAutocomplete.bind(this);
+    this.boundOnBlur = this.onBlur.bind(this);
+    this.proxyElement = element.ownerDocument.createElement('span');
+    appendStyle(this.proxyElement, textPromptStyles);
+    this.contentElement = this.proxyElement.createChild('div', 'text-prompt-root');
+    this.proxyElement.style.display = this.proxyElementDisplay;
+    if (element.parentElement) {
+      element.parentElement.insertBefore(this.proxyElement, element);
+    }
+    this.contentElement.appendChild(element);
+    let jslog = VisualLogging.textField().track({
+      keydown: 'ArrowLeft|ArrowUp|PageUp|Home|PageDown|ArrowRight|ArrowDown|End|Space|Tab|Enter|Escape',
+      change: true,
+    });
+
+    if (this.jslogContext) {
+      jslog = jslog.context(this.jslogContext);
+    }
+    if (!this.#element.hasAttribute('jslog')) {
+      this.#element.setAttribute('jslog', `${jslog}`);
+    }
+    this.#element.classList.add('text-prompt');
+    this.#updateAriaRole();
+    this.#element.setAttribute('contenteditable', 'plaintext-only');
+    this.element().addEventListener('keydown', this.boundOnKeyDown, false);
+    this.#element.addEventListener('focusin', this.#boundOnFocusIn, false);
+    if (this.element().hasFocus()) {
+      this.#onFocusIn();
+    }
+    this.#element.addEventListener('input', this.boundOnInput, false);
+    this.#element.addEventListener('wheel', this.boundOnMouseWheel, false);
+    this.#element.addEventListener('selectstart', this.boundClearAutocomplete, false);
+    this.#element.addEventListener('blur', this.boundOnBlur, false);
+
+    this.suggestBox = new SuggestBox(this, 20);
+
+    if (this.#title) {
+      Tooltip.install(this.proxyElement, this.#title);
+    }
+
+    return this.proxyElement;
+  }
+
+  element(): HTMLElement {
+    if (!this.#element) {
+      throw new Error('Expected an already attached element!');
+    }
+    return this.#element as HTMLElement;
+  }
+
+  detach(): void {
+    this.removeFromElement();
+    if (this.focusRestorer) {
+      this.focusRestorer.restore();
+    }
+    if (this.proxyElement?.parentElement) {
+      this.proxyElement.parentElement.insertBefore(this.element(), this.proxyElement);
+      this.proxyElement.remove();
+    }
+    delete this.proxyElement;
+    this.element().classList.remove('text-prompt');
+    this.element().removeAttribute('contenteditable');
+    this.element().removeAttribute('role');
+    ARIAUtils.clearAutocomplete(this.element());
+    ARIAUtils.setHasPopup(this.element(), ARIAUtils.PopupRole.FALSE);
+    ARIAUtils.unsetExpandable(this.element());
+  }
+
+  textWithCurrentSuggestion(): string {
+    const text = this.text();
+    if (!this.queryRange || !this.#currentSuggestion) {
+      return text;
+    }
+    const suggestion = this.#currentSuggestion.text;
+    return text.substring(0, this.queryRange.startColumn) + suggestion + text.substring(this.queryRange.endColumn);
+  }
+
+  text(): string {
+    let text: string = this.element().textContent || '';
+    if (this.ghostTextElement.parentNode) {
+      const addition = this.ghostTextElement.textContent || '';
+      text = text.substring(0, text.length - addition.length);
+    }
+    return text;
+  }
+
+  setText(text: string): void {
+    this.clearAutocomplete();
+    this.element().textContent = text;
+    this.previousText = this.text();
+    this.#savedSelection = {anchorColumn: text.length, focusColumn: text.length};
+    if (this.element().hasFocus()) {
+      this.moveCaretToEndOfPrompt();
+      this.element().scrollIntoView();
+    }
+  }
+
+  setSelectedRange(startIndex: number, endIndex: number): void {
+    if (startIndex < 0) {
+      throw new RangeError('Selected range start must be a nonnegative integer');
+    }
+    const textContent = this.element().textContent;
+    const textContentLength = textContent ? textContent.length : 0;
+    if (endIndex > textContentLength) {
+      endIndex = textContentLength;
+    }
+    if (endIndex < startIndex) {
+      endIndex = startIndex;
+    }
+
+    this.setDOMSelection(startIndex, endIndex);
+  }
+
+  selectAll(): void {
+    this.setSelectedRange(0, this.text().length);
+  }
+
+  focus(): void {
+    if (!this.element().hasFocus()) {
+      if (this.#savedSelection) {
+        const textLength = this.text().length;
+        const anchorColumn = Platform.NumberUtilities.clamp(this.#savedSelection.anchorColumn, 0, textLength);
+        const focusColumn = Platform.NumberUtilities.clamp(this.#savedSelection.focusColumn, 0, textLength);
+        this.setDOMSelection(anchorColumn, focusColumn);
+      } else {
+        this.moveCaretToEndOfPrompt();
+      }
+    }
+    this.element().focus();
+  }
+
+  title(): string {
+    return this.#title;
+  }
+
+  setTitle(title: string): void {
+    this.#title = title;
+    if (this.proxyElement) {
+      Tooltip.install(this.proxyElement, title);
+    }
+  }
+
+  setPlaceholder(placeholder: string, ariaPlaceholder?: string): void {
+    if (placeholder) {
+      this.element().setAttribute('data-placeholder', placeholder);
+      // TODO(https://github.com/nvaccess/nvda/issues/10164): Remove ariaPlaceholder once the NVDA bug is fixed
+      // ariaPlaceholder and placeholder may differ, like in case the placeholder contains a '?'
+      this.#ariaPlaceholder = ariaPlaceholder || placeholder;
+    } else {
+      this.element().removeAttribute('data-placeholder');
+      this.#ariaPlaceholder = null;
+      if (this.#ariaLabelFromPlaceholder) {
+        this.element().removeAttribute('aria-label');
+        this.#ariaLabelFromPlaceholder = false;
+      }
+    }
+    this.#updateAriaRole();
+  }
+
+  setEnabled(enabled: boolean): void {
+    if (enabled) {
+      this.element().setAttribute('contenteditable', 'plaintext-only');
+    } else {
+      this.element().removeAttribute('contenteditable');
+    }
+    this.element().classList.toggle('disabled', !enabled);
+  }
+
+  private removeFromElement(): void {
+    this.clearAutocomplete();
+    this.#savedSelection = null;
+    this.element().removeEventListener(
+        'keydown', (this.boundOnKeyDown as (this: HTMLElement, arg1: Event) => void), false);
+    this.element().removeEventListener('focusin', (this.#boundOnFocusIn as (this: HTMLElement, arg1: Event) => void),
+                                       false);
+    if (this.#boundSaveSelection) {
+      this.element().ownerDocument.removeEventListener('selectionchange', this.#boundSaveSelection, false);
+    }
+    this.element().removeEventListener('input', (this.boundOnInput as (this: HTMLElement, arg1: Event) => void), false);
+    this.element().removeEventListener(
+        'selectstart', (this.boundClearAutocomplete as (this: HTMLElement, arg1: Event) => void), false);
+    this.element().removeEventListener('blur', (this.boundOnBlur as (this: HTMLElement, arg1: Event) => void), false);
+    if (this.isEditing) {
+      this.stopEditing();
+    }
+    if (this.suggestBox) {
+      this.suggestBox.hide();
+    }
+  }
+
+  private startEditing(blurListener?: ((arg0: Event) => void)): void {
+    this.isEditing = true;
+    if (this.contentElement) {
+      this.contentElement.classList.add('text-prompt-editing');
+    }
+    this.focusRestorer = new ElementFocusRestorer(this.element());
+    if (blurListener) {
+      this.blurListener = blurListener;
+      this.element().addEventListener('blur', this.blurListener, false);
+    }
+    this.oldTabIndex = this.element().tabIndex;
+    if (this.element().tabIndex < 0) {
+      this.element().tabIndex = 0;
+    }
+    if (!this.text()) {
+      this.autoCompleteSoon();
+    }
+  }
+
+  private stopEditing(): void {
+    this.element().tabIndex = (this.oldTabIndex as number);
+    if (this.blurListener) {
+      this.element().removeEventListener('blur', this.blurListener, false);
+    }
+    if (this.contentElement) {
+      this.contentElement.classList.remove('text-prompt-editing');
+    }
+    delete this.isEditing;
+  }
+
+  onMouseWheel(_event: Event): void {
+    // Subclasses can implement.
+  }
+
+  onKeyDown(event: KeyboardEvent): void {
+    let handled = false;
+    if (this.isSuggestBoxVisible() && this.suggestBox?.keyPressed(event)) {
+      void VisualLogging.logKeyDown(this.suggestBox.element, event);
+      event.consume(true);
+      return;
+    }
+
+    switch (event.key) {
+      case 'Tab':
+        handled = this.tabKeyPressed(event);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+      case 'PageUp':
+      case 'Home':
+        this.clearAutocomplete();
+        break;
+      case 'PageDown':
+      case 'ArrowRight':
+      case 'ArrowDown':
+      case 'End':
+        if (this.isCaretAtEndOfPrompt()) {
+          handled = this.acceptAutoComplete();
+        } else {
+          this.clearAutocomplete();
+        }
+        break;
+      case 'Escape':
+        if (this.isSuggestBoxVisible() || this.#currentSuggestion) {
+          this.clearAutocomplete();
+          handled = true;
+        }
+        break;
+      case ' ':  // Space
+        if (event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+          this.autoCompleteSoon(true);
+          handled = true;
+        }
+        break;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+    }
+
+    if (handled) {
+      event.consume(true);
+    }
+  }
+
+  private acceptSuggestionOnStopCharacters(key: string): boolean {
+    if (!this.#currentSuggestion || !this.queryRange || key.length !== 1 ||
+        !this.completionStopCharacters?.includes(key) ||
+        this.#currentSuggestion.disableAcceptSuggestionOnStopCharacters) {
+      return false;
+    }
+
+    const query = this.text().substring(this.queryRange.startColumn, this.queryRange.endColumn);
+    if (query && this.#currentSuggestion.text.startsWith(query + key)) {
+      this.queryRange.endColumn += 1;
+      return this.acceptAutoComplete();
+    }
+    return false;
+  }
+
+  onInput(ev: Event): void {
+    const event = (ev as InputEvent);
+    let text = this.text();
+    const currentEntry = event.data;
+
+    if (event.inputType === 'insertFromPaste' && text.includes('\n')) {
+      /* Ensure that we remove any linebreaks from copied/pasted content
+       * to avoid breaking the rendering of the filter bar.
+       * See crbug.com/849563.
+       * We don't let users enter linebreaks when
+       * typing manually, so we should escape them if copying text in.
+       */
+      text = Platform.StringUtilities.stripLineBreaks(text);
+      this.setText(text);
+    }
+
+    // Skip the current ')' entry if the caret is right before a ')' and there's an unmatched '('.
+    const caretPosition = this.getCaretPosition();
+    if (currentEntry === ')' && caretPosition >= 0 && this.leftParenthesesIndices.length > 0) {
+      const nextCharAtCaret = text[caretPosition];
+      if (nextCharAtCaret === ')' && this.tryMatchingLeftParenthesis(caretPosition)) {
+        text = text.substring(0, caretPosition) + text.substring(caretPosition + 1);
+        this.setText(text);
+        return;
+      }
+    }
+
+    if (currentEntry && !this.acceptSuggestionOnStopCharacters(currentEntry)) {
+      const hasCommonPrefix = text.startsWith(this.previousText) || this.previousText.startsWith(text);
+      if (this.queryRange && hasCommonPrefix) {
+        this.queryRange.endColumn += text.length - this.previousText.length;
+      }
+    }
+    this.refreshGhostText();
+    this.previousText = text;
+    this.dispatchEventToListeners(Events.TEXT_CHANGED);
+
+    this.autoCompleteSoon();
+  }
+
+  #getOffsetInElement(container: Node, offset: number): number {
+    const textLength = this.text().length;
+    const beforeRange = document.createRange();
+    beforeRange.setStart(this.element(), 0);
+    beforeRange.setEnd(container, offset);
+    return Platform.NumberUtilities.clamp(beforeRange.toString().length, 0, textLength);
+  }
+
+  #saveSelection(): void {
+    if (!this.#element || !this.element().isConnected || !this.element().hasFocus()) {
+      return;
+    }
+    const selection = this.element().getComponentSelection();
+    if (!selection || selection.rangeCount === 0 || !selection.anchorNode || !selection.focusNode) {
+      return;
+    }
+    if (!selection.anchorNode.isSelfOrDescendant(this.element()) ||
+        !selection.focusNode.isSelfOrDescendant(this.element())) {
+      return;
+    }
+    const anchorColumn = this.#getOffsetInElement(selection.anchorNode, selection.anchorOffset);
+    const focusColumn = this.#getOffsetInElement(selection.focusNode, selection.focusOffset);
+
+    this.#savedSelection = {
+      anchorColumn,
+      focusColumn,
+    };
+  }
+
+  acceptAutoComplete(): boolean {
+    let result = false;
+    if (this.isSuggestBoxVisible() && this.suggestBox) {
+      result = this.suggestBox.acceptSuggestion();
+    }
+    if (!result) {
+      result = this.#acceptSuggestion();
+    }
+    if (this.usesSuggestionBuilder && result) {
+      // Trigger autocompletions for text prompts using suggestion builders
+      this.autoCompleteSoon();
+    }
+    return result;
+  }
+
+  clearAutocomplete(): void {
+    const beforeText = this.textWithCurrentSuggestion();
+
+    if (this.isSuggestBoxVisible() && this.suggestBox) {
+      this.suggestBox.hide();
+    }
+    this.clearAutocompleteTimeout();
+    this.queryRange = null;
+    this.refreshGhostText();
+
+    if (beforeText !== this.textWithCurrentSuggestion()) {
+      this.dispatchEventToListeners(Events.TEXT_CHANGED);
+    }
+    this.#currentSuggestion = null;
+  }
+
+  #onFocusIn(): void {
+    if (this.#boundSaveSelection) {
+      this.element().ownerDocument.addEventListener('selectionchange', this.#boundSaveSelection, false);
+    }
+  }
+
+  private onBlur(): void {
+    if (this.#boundSaveSelection) {
+      this.element().ownerDocument.removeEventListener('selectionchange', this.#boundSaveSelection, false);
+    }
+    this.clearAutocomplete();
+  }
+
+  private refreshGhostText(): void {
+    if (this.#currentSuggestion?.hideGhostText) {
+      this.ghostTextElement.remove();
+      return;
+    }
+    if (this.queryRange && this.#currentSuggestion && this.isCaretAtEndOfPrompt() &&
+        this.#currentSuggestion.text.startsWith(this.text().substring(this.queryRange.startColumn))) {
+      this.ghostTextElement.textContent =
+          this.#currentSuggestion.text.substring(this.queryRange.endColumn - this.queryRange.startColumn);
+      this.element().appendChild(this.ghostTextElement);
+    } else {
+      this.ghostTextElement.remove();
+    }
+  }
+
+  private clearAutocompleteTimeout(): void {
+    if (this.completeTimeout) {
+      clearTimeout(this.completeTimeout);
+      delete this.completeTimeout;
+    }
+    this.completionRequestId++;
+  }
+
+  autoCompleteSoon(force?: boolean): void {
+    const immediately = this.isSuggestBoxVisible() || force;
+    if (!this.completeTimeout) {
+      this.completeTimeout =
+          window.setTimeout(this.complete.bind(this, force), immediately ? 0 : this.autocompletionTimeout);
+    }
+  }
+
+  async complete(force?: boolean): Promise<void> {
+    this.clearAutocompleteTimeout();
+    if (!this.loadCompletions || !this.element().isConnected) {
+      return;
+    }
+
+    const selection = this.element().getComponentSelection();
+    if (!selection || selection.rangeCount === 0) {
+      return;
+    }
+    const selectionRange = selection.getRangeAt(0);
+
+    let shouldExit;
+
+    if (!force && !this.isCaretAtEndOfPrompt() && !this.isSuggestBoxVisible()) {
+      shouldExit = true;
+    } else if (!selection.isCollapsed) {
+      shouldExit = true;
+    }
+
+    if (shouldExit) {
+      this.clearAutocomplete();
+      return;
+    }
+
+    const wordQueryRange = rangeOfWord(
+        selectionRange.startContainer, selectionRange.startOffset, this.completionStopCharacters, this.element(),
+        'backward');
+
+    const expressionRange = wordQueryRange.cloneRange();
+    expressionRange.collapse(true);
+    expressionRange.setStartBefore(this.element());
+    const completionRequestId = ++this.completionRequestId;
+    const completions =
+        await this.loadCompletions.call(null, expressionRange.toString(), wordQueryRange.toString(), Boolean(force));
+    this.completionsReady(completionRequestId, (selection), wordQueryRange, Boolean(force), completions);
+  }
+
+  disableDefaultSuggestionForEmptyInput(): void {
+    this.#disableDefaultSuggestionForEmptyInput = true;
+  }
+
+  private boxForAnchorAtStart(selection: Selection, textRange: Range): AnchorBox {
+    const rangeCopy = selection.getRangeAt(0).cloneRange();
+    const anchorElement = document.createElement('span');
+    anchorElement.textContent = '\u200B';
+    textRange.insertNode(anchorElement);
+    const box = anchorElement.boxInWindow(window);
+    anchorElement.remove();
+    selection.removeAllRanges();
+    selection.addRange(rangeCopy);
+    return box;
+  }
+
+  additionalCompletions(_query: string): Suggestion[] {
+    return [];
+  }
+
+  private completionsReady(
+      completionRequestId: number, selection: Selection, originalWordQueryRange: Range, force: boolean,
+      completions: Suggestion[]): void {
+    if (this.completionRequestId !== completionRequestId) {
+      return;
+    }
+
+    const query = originalWordQueryRange.toString();
+
+    // Filter out dupes.
+    const store = new Set<string>();
+    completions = completions.filter(item => !store.has(item.text) && Boolean(store.add(item.text)));
+
+    if (query || force) {
+      if (query) {
+        completions = completions.concat(this.additionalCompletions(query));
+      } else {
+        completions = this.additionalCompletions(query).concat(completions);
+      }
+    }
+
+    if (!completions.length) {
+      this.clearAutocomplete();
+      return;
+    }
+
+    const selectionRange = selection.getRangeAt(0);
+
+    const fullWordRange = document.createRange();
+    fullWordRange.setStart(originalWordQueryRange.startContainer, originalWordQueryRange.startOffset);
+    fullWordRange.setEnd(selectionRange.endContainer, selectionRange.endOffset);
+
+    if (query + selectionRange.toString() !== fullWordRange.toString()) {
+      return;
+    }
+
+    const beforeRange = document.createRange();
+    beforeRange.setStart(this.element(), 0);
+    beforeRange.setEnd(fullWordRange.startContainer, fullWordRange.startOffset);
+    this.queryRange = new TextUtils.TextRange.TextRange(
+        0, beforeRange.toString().length, 0, beforeRange.toString().length + fullWordRange.toString().length);
+
+    const shouldSelect = !this.#disableDefaultSuggestionForEmptyInput || Boolean(this.text());
+    if (this.suggestBox) {
+      this.suggestBox.updateSuggestions(
+          this.boxForAnchorAtStart(selection, fullWordRange), completions, shouldSelect, !this.isCaretAtEndOfPrompt(),
+          this.text());
+    }
+  }
+
+  applySuggestion(suggestion: Suggestion|null, isIntermediateSuggestion?: boolean): void {
+    this.#currentSuggestion = suggestion;
+    this.refreshGhostText();
+    if (isIntermediateSuggestion) {
+      this.dispatchEventToListeners(Events.TEXT_CHANGED);
+    }
+  }
+
+  acceptSuggestion(): void {
+    this.#acceptSuggestion();
+  }
+
+  #acceptSuggestion(): boolean {
+    if (!this.queryRange) {
+      return false;
+    }
+
+    const suggestionLength = this.#currentSuggestion ? this.#currentSuggestion.text.length : 0;
+    const selectionRange = this.#currentSuggestion ? this.#currentSuggestion.selectionRange : null;
+    const endColumn = selectionRange ? selectionRange.endColumn : suggestionLength;
+    const startColumn = selectionRange ? selectionRange.startColumn : suggestionLength;
+    this.element().textContent = this.textWithCurrentSuggestion();
+    this.setDOMSelection(this.queryRange.startColumn + startColumn, this.queryRange.startColumn + endColumn);
+    this.updateLeftParenthesesIndices();
+
+    this.clearAutocomplete();
+    this.dispatchEventToListeners(Events.TEXT_CHANGED);
+
+    return true;
+  }
+
+  ownerElement(): Element {
+    return this.element();
+  }
+
+  setDOMSelection(startColumn: number, endColumn: number): void {
+    this.element().normalize();
+    const node = this.element().childNodes[0];
+    if (!node || node === this.ghostTextElement || node.nodeType !== Node.TEXT_NODE) {
+      this.#savedSelection = {anchorColumn: 0, focusColumn: 0};
+      this.element().getComponentSelection()?.setBaseAndExtent(this.element(), 0, this.element(), 0);
+      return;
+    }
+    const length = (node as Text).length;
+    const anchorOffset = Platform.NumberUtilities.clamp(startColumn, 0, length);
+    const focusOffset = Platform.NumberUtilities.clamp(endColumn, 0, length);
+    this.#savedSelection = {anchorColumn: anchorOffset, focusColumn: focusOffset};
+    this.element().getComponentSelection()?.setBaseAndExtent(node, anchorOffset, node, focusOffset);
+  }
+
+  isSuggestBoxVisible(): boolean {
+    return this.suggestBox?.visible() ?? false;
+  }
+
+  private isCaretAtEndOfPrompt(): boolean {
+    const selection = this.element().getComponentSelection();
+    if (!selection || selection.rangeCount === 0 || !selection.isCollapsed) {
+      return false;
+    }
+
+    const selectionRange = selection.getRangeAt(0);
+    let node: (Node|null)|Node = selectionRange.startContainer;
+    if (!node.isSelfOrDescendant(this.element())) {
+      return false;
+    }
+
+    if (this.ghostTextElement.isAncestor(node)) {
+      return true;
+    }
+
+    if (node.nodeType === Node.TEXT_NODE && selectionRange.startOffset < (node.nodeValue || '').length) {
+      return false;
+    }
+
+    let foundNextText = false;
+    while (node) {
+      if (node.nodeType === Node.TEXT_NODE && node.nodeValue?.length) {
+        if (foundNextText && !this.ghostTextElement.isAncestor(node)) {
+          return false;
+        }
+        foundNextText = true;
+      }
+
+      node = node.traverseNextNode(this.#element);
+    }
+
+    return true;
+  }
+
+  moveCaretToEndOfPrompt(): void {
+    const selection = this.element().getComponentSelection();
+    const selectionRange = document.createRange();
+
+    let container: Node = this.element();
+    while (container.lastChild) {
+      container = container.lastChild;
+    }
+    let offset = 0;
+    if (container.nodeType === Node.TEXT_NODE) {
+      const textNode = (container as Text);
+      offset = (textNode.textContent || '').length;
+    }
+    const textLength = this.text().length;
+    this.#savedSelection = {anchorColumn: textLength, focusColumn: textLength};
+    selectionRange.setStart(container, offset);
+    selectionRange.setEnd(container, offset);
+
+    if (selection) {
+      selection.removeAllRanges();
+      selection.addRange(selectionRange);
+    }
+  }
+
+  /**
+   * -1 if no caret can be found in text prompt
+   */
+  private getCaretPosition(): number {
+    if (!this.element().hasFocus()) {
+      return -1;
+    }
+
+    const selection = this.element().getComponentSelection();
+    if (!selection || selection.rangeCount === 0 || !selection.isCollapsed) {
+      return -1;
+    }
+    const selectionRange = selection.getRangeAt(0);
+    if (selectionRange.startOffset !== selectionRange.endOffset) {
+      return -1;
+    }
+    return selectionRange.startOffset;
+  }
+
+  tabKeyPressed(_event: Event): boolean {
+    return this.acceptAutoComplete();
+  }
+
+  /**
+   * Try matching the most recent open parenthesis with the given right
+   * parenthesis, and closes the matched left parenthesis if found.
+   * Return the result of the matching.
+   */
+  private tryMatchingLeftParenthesis(rightParenthesisIndex: number): boolean {
+    const leftParenthesesIndices = this.leftParenthesesIndices;
+    if (leftParenthesesIndices.length === 0 || rightParenthesisIndex < 0) {
+      return false;
+    }
+
+    for (let i = leftParenthesesIndices.length - 1; i >= 0; --i) {
+      if (leftParenthesesIndices[i] < rightParenthesisIndex) {
+        leftParenthesesIndices.splice(i, 1);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private updateLeftParenthesesIndices(): void {
+    const text = this.text();
+    const leftParenthesesIndices: number[] = this.leftParenthesesIndices = [];
+    for (let i = 0; i < text.length; ++i) {
+      if (text[i] === '(') {
+        leftParenthesesIndices.push(i);
+      }
+    }
+  }
+
+  suggestBoxForTest(): SuggestBox|undefined {
+    return this.suggestBox;
+  }
+
+  currentSuggestion(): Suggestion|null {
+    return this.#currentSuggestion;
+  }
+}
+
+const DefaultAutocompletionTimeout = 250;
+
+export const enum Events {
+  TEXT_CHANGED = 'TextChanged',
+}
+
+export interface EventTypes {
+  [Events.TEXT_CHANGED]: void;
+}

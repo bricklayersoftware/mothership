@@ -1,0 +1,647 @@
+// Copyright 2021 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import '../../../ui/components/expandable_list/expandable_list.js';
+import '../../../ui/components/report_view/report_view.js';
+import '../../../ui/legacy/legacy.js';
+import '../../../ui/kit/kit.js';
+
+import * as Common from '../../../core/common/common.js';
+import * as i18n from '../../../core/i18n/i18n.js';
+import type * as Platform from '../../../core/platform/platform.js';
+import * as SDK from '../../../core/sdk/sdk.js';
+import * as Protocol from '../../../generated/protocol.js';
+import * as Buttons from '../../../ui/components/buttons/buttons.js';
+import type * as ExpandableList from '../../../ui/components/expandable_list/expandable_list.js';
+import type * as ReportView from '../../../ui/components/report_view/report_view.js';
+import * as Components from '../../../ui/legacy/components/utils/utils.js';
+import * as UI from '../../../ui/legacy/legacy.js';
+import {html, type LitTemplate, nothing, render, type TemplateResult} from '../../../ui/lit/lit.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
+
+import {NotRestoredReasonDescription} from './BackForwardCacheStrings.js';
+import backForwardCacheViewStyles from './backForwardCacheView.css.js';
+
+const UIStrings = {
+  /**
+   * @description Section header for the main frame in the back/forward cache view of the Application panel.
+   */
+  mainFrame: 'Main frame',
+  /**
+   * @description Title text in the back/forward cache view of the Application panel.
+   */
+  backForwardCacheTitle: 'Back/forward cache',
+  /**
+   * @description Status text for the main frame in the back/forward cache view of the Application panel when unavailable.
+   */
+  unavailable: 'unavailable',
+  /**
+   * @description Entry name text in the back/forward cache view of the Application panel.
+   */
+  url: 'URL',
+  /**
+   * @description Status text indicating unknown back/forward cache status in the back/forward cache view of the Application panel.
+   */
+  unknown: 'Unknown status',
+  /**
+   * @description Status text indicating that the back/forward cache was not used and a normal navigation occurred instead in the back/forward cache view of the Application panel.
+   */
+  normalNavigation:
+      'Not served from back/forward cache: to trigger back/forward cache, use Chrome’s back/forward buttons, or use the test button below to automatically navigate away and back',
+  /**
+   * @description Status text indicating that the back/forward cache was used to restore the page instead of reloading it in the back/forward cache view of the Application panel.
+   */
+  restoredFromBFCache: 'Successfully served from back/forward cache',
+  /**
+   * @description Label for actionable reasons that prevent the page from being eligible for back/forward cache in the back/forward cache view of the Application panel.
+   */
+  pageSupportNeeded: 'Actionable',
+  /**
+   * @description Label indicating completion of the back/forward cache test in the back/forward cache view of the Application panel.
+   */
+  testCompleted: 'Back/forward cache test completed',
+  /**
+   * @description Explanation for actionable items that prevent the page from being eligible for back/forward cache in the back/forward cache view of the Application panel.
+   */
+  pageSupportNeededExplanation:
+      'These reasons are actionable i.e. they can be cleaned up to make the page eligible for back/forward cache',
+  /**
+   * @description Label for circumstantial reasons that prevent the page from being eligible for back/forward cache in the back/forward cache view of the Application panel.
+   */
+  circumstantial: 'Not actionable',
+  /**
+   * @description Explanation for circumstantial items that prevent the page from being eligible for back/forward cache in the back/forward cache view of the Application panel.
+   */
+  circumstantialExplanation:
+      'These reasons aren’t actionable i.e. caching was prevented by something outside of the direct control of the page',
+  /**
+   * @description Label for reasons pending Chrome support that prevent the page from being eligible for back/forward cache in the back/forward cache view of the Application panel.
+   */
+  supportPending: 'Pending support',
+  /**
+   * @description Button text to test whether back/forward cache is available for the page in the back/forward cache view of the Application panel.
+   */
+  runTest: 'Test back/forward cache',
+  /**
+   * @description Button text for the disabled button while the test is running in the back/forward cache view of the Application panel.
+   */
+  runningTest: 'Running test',
+  /**
+   * @description Link text explaining back/forward cache eligibility in the back/forward cache view of the Application panel.
+   */
+  learnMore: 'Learn more: back/forward cache eligibility',
+  /**
+   * @description Link text about unload handlers in the back/forward cache view of the Application panel.
+   */
+  neverUseUnload: 'Learn more: never use unload handler',
+  /**
+   * @description Explanation for reasons pending support that prevent the page from being eligible for back/forward cache in the back/forward cache view of the Application panel.
+   */
+  supportPendingExplanation:
+      'Chrome support for these reasons is pending i.e. they won’t prevent the page from being eligible for back/forward cache in a future version of Chrome',
+  /**
+   * @description Prefix text preceding the ID of the extension that blocked the page from being eligible for back/forward cache in the back/forward cache view of the Application panel.
+   */
+  blockingExtensionId: 'Extension ID: ',
+  /**
+   * @description Label for the frames section in the back/forward cache view of the Application panel.
+   */
+  framesTitle: 'Frames',
+  /**
+   * @description Summary of the total number of issues found in a single frame in the back/forward cache view of the Application panel.
+   */
+  issuesInSingleFrame: '{n, plural, =1 {# issue found in 1 frame} other {# issues found in 1 frame}}',
+  /**
+   * @description Summary of the total number of issues found and the number of frames they were found in the back/forward cache view of the Application panel.
+   * 'm' is never less than 2.
+   * @example {3} m
+   */
+  issuesInMultipleFrames: '{n, plural, =1 {# issue found in {m} frames} other {# issues found in {m} frames}}',
+  /**
+   * @description Shows the number of frames with a particular issue in the back/forward cache view of the Application panel.
+   */
+  framesPerIssue: '{n, plural, =1 {# frame} other {# frames}}',
+  /**
+   * @description Title for a frame in the frame tree that doesn't have a URL in the back/forward cache view of the Application panel.
+   * @example {3} PH1
+   */
+  blankURLTitle: 'Blank URL [{PH1}]',
+  /**
+   * @description Shows the number of files with a particular issue in the back/forward cache view of the Application panel.
+   */
+  filesPerIssue: '{n, plural, =1 {# file} other {# files}}',
+} as const;
+
+const str_ = i18n.i18n.registerUIStrings('panels/application/components/BackForwardCacheView.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+const {widget} = UI.Widget;
+
+const enum ScreenStatusType {
+  RUNNING = 'Running',
+  RESULT = 'Result',
+}
+
+function renderMainFrameInformation(
+    frame: SDK.ResourceTreeModel.ResourceTreeFrame|null,
+    frameTreeData: {node: FrameTreeNodeData, frameCount: number, issueCount: number}|undefined,
+    reasonToFramesMap: Map<Protocol.Page.BackForwardCacheNotRestoredReason, string[]>, screenStatus: ScreenStatusType,
+    navigateAwayAndBack: () => Promise<void>): TemplateResult {
+  if (!frame) {
+    // clang-format of
+    return html`
+      <devtools-report-key>
+        ${i18nString(UIStrings.mainFrame)}
+      </devtools-report-key>
+      <devtools-report-value>
+        ${i18nString(UIStrings.unavailable)}
+      </devtools-report-value>`;
+    // clang-format on
+  }
+  const isTestRunning = (screenStatus === ScreenStatusType.RUNNING);
+  // Prevent running BFCache test on the DevTools window itself via DevTools on DevTools
+  const isTestingForbidden = Common.ParsedURL.schemeIs(frame.url, 'devtools:');
+  // clang-format off
+  return html`
+    ${renderBackForwardCacheStatus(frame.backForwardCacheDetails.restoredFromCache)}
+    <devtools-report-key>${i18nString(UIStrings.url)}</devtools-report-key>
+    <devtools-report-value>${frame.url}</devtools-report-value>
+    ${maybeRenderFrameTree(frameTreeData)}
+    <devtools-report-section>
+      <devtools-button
+        aria-label=${i18nString(UIStrings.runTest)}
+        .disabled=${isTestRunning || isTestingForbidden}
+        .spinner=${isTestRunning}
+        .variant=${Buttons.Button.Variant.PRIMARY}
+        @click=${navigateAwayAndBack}
+        jslog=${VisualLogging.action('back-forward-cache.run-test').track({click: true})}>
+        ${isTestRunning ? html`
+          ${i18nString(UIStrings.runningTest)}`:`
+          ${i18nString(UIStrings.runTest)}
+        `}
+      </devtools-button>
+    </devtools-report-section>
+    <devtools-report-divider>
+    </devtools-report-divider>
+    ${maybeRenderExplanations(frame.backForwardCacheDetails.explanations,
+        frame.backForwardCacheDetails.explanationsTree,
+        reasonToFramesMap)}
+    <devtools-report-section>
+      <devtools-link href="https://web.dev/bfcache/" class="link"
+      jslogcontext="learn-more.eligibility">
+        ${i18nString(UIStrings.learnMore)}
+      </devtools-link>
+    </devtools-report-section>`;
+  // clang-format on
+}
+
+function maybeRenderFrameTree(
+    frameTreeData: {node: FrameTreeNodeData, frameCount: number, issueCount: number}|undefined): LitTemplate {
+  if (!frameTreeData || (frameTreeData.frameCount === 0 && frameTreeData.issueCount === 0)) {
+    return nothing;
+  }
+
+  function renderFrameTreeNode(node: FrameTreeNodeData): TemplateResult {
+    // clang-format off
+    return html`
+      <li role="treeitem" class="text-ellipsis">
+        ${node.iconName ? html`
+          <devtools-icon class="inline-icon extra-large" .name=${node.iconName} style="margin-bottom: -3px;">
+          </devtools-icon>
+        ` : nothing}
+        ${node.text}
+        ${node.children?.length ? html`
+          <ul role="group">
+            ${node.children.map(child => renderFrameTreeNode(child))}
+          </ul>` : nothing}
+      </li>`;
+    // clang-format on
+  }
+
+  let title = '';
+  // The translation pipeline does not support nested plurals. We avoid this
+  // here by pulling out the logic for one of the plurals into code instead.
+  if (frameTreeData.frameCount === 1) {
+    title = i18nString(UIStrings.issuesInSingleFrame, {n: frameTreeData.issueCount});
+  } else {
+    title = i18nString(UIStrings.issuesInMultipleFrames, {n: frameTreeData.issueCount, m: frameTreeData.frameCount});
+  }
+  // clang-format off
+  return html`
+    <devtools-report-key jslog=${VisualLogging.section('frames')}>${i18nString(UIStrings.framesTitle)}</devtools-report-key>
+    <devtools-report-value>
+      <devtools-tree .template=${html`
+        <ul role="tree">
+          <li role="treeitem" class="text-ellipsis">
+            ${title}
+            <ul role="group">
+              ${renderFrameTreeNode(frameTreeData.node)}
+            </ul>
+          </li>
+        </ul>
+      `}>
+      </devtools-tree>
+    </devtools-report-value>`;
+  // clang-format on
+}
+
+function renderBackForwardCacheStatus(status: boolean|undefined): TemplateResult {
+  switch (status) {
+    case true:
+      // clang-format off
+      return html`
+        <devtools-report-section autofocus tabindex="-1">
+          <div class="status extra-large">
+            <devtools-icon class="inline-icon extra-large" name="check-circle" style="color: var(--icon-checkmark-green);">
+            </devtools-icon>
+          </div>
+          ${i18nString(UIStrings.restoredFromBFCache)}
+        </devtools-report-section>`;
+      // clang-format on
+    case false:
+      // clang-format off
+      return html`
+        <devtools-report-section autofocus tabindex="-1">
+          <div class="status">
+            <devtools-icon class="inline-icon extra-large" name="clear">
+            </devtools-icon>
+          </div>
+          ${i18nString(UIStrings.normalNavigation)}
+        </devtools-report-section>`;
+      // clang-format on
+  }
+  // clang-format off
+  return html`
+    <devtools-report-section autofocus tabindex="-1">
+      ${i18nString(UIStrings.unknown)}
+    </devtools-report-section>`;
+  // clang-format on
+}
+
+function maybeRenderExplanations(
+    explanations: Protocol.Page.BackForwardCacheNotRestoredExplanation[],
+    explanationTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree|undefined,
+    reasonToFramesMap: Map<Protocol.Page.BackForwardCacheNotRestoredReason, string[]>): LitTemplate {
+  if (explanations.length === 0) {
+    return nothing;
+  }
+
+  const pageSupportNeeded = explanations.filter(
+      explanation => explanation.type === Protocol.Page.BackForwardCacheNotRestoredReasonType.PageSupportNeeded);
+  const supportPending = explanations.filter(
+      explanation => explanation.type === Protocol.Page.BackForwardCacheNotRestoredReasonType.SupportPending);
+  const circumstantial = explanations.filter(
+      explanation => explanation.type === Protocol.Page.BackForwardCacheNotRestoredReasonType.Circumstantial);
+
+  // Disabled until https://crbug.com/1079231 is fixed.
+  // clang-format off
+  return html`
+    ${renderExplanations(i18nString(UIStrings.pageSupportNeeded), i18nString(UIStrings.pageSupportNeededExplanation), pageSupportNeeded, reasonToFramesMap)}
+    ${renderExplanations(i18nString(UIStrings.supportPending), i18nString(UIStrings.supportPendingExplanation), supportPending, reasonToFramesMap)}
+    ${renderExplanations(i18nString(UIStrings.circumstantial), i18nString(UIStrings.circumstantialExplanation), circumstantial, reasonToFramesMap)}`;
+  // clang-format on
+}
+
+function renderExplanations(
+    category: Platform.UIString.LocalizedString, explainerText: Platform.UIString.LocalizedString,
+    explanations: Protocol.Page.BackForwardCacheNotRestoredExplanation[],
+    reasonToFramesMap: Map<Protocol.Page.BackForwardCacheNotRestoredReason, string[]>): TemplateResult {
+  // Disabled until https://crbug.com/1079231 is fixed.
+  // clang-format off
+  return html`
+    ${explanations.length > 0 ? html`
+      <devtools-report-section-header>
+        ${category}
+        <div class="help-outline-icon">
+          <devtools-icon class="inline-icon medium" name="help" title=${explainerText}>
+          </devtools-icon>
+        </div>
+      </devtools-report-section-header>
+      ${explanations.map(explanation => renderReason(explanation, reasonToFramesMap.get(explanation.reason)))}
+    ` : nothing}`;
+  // clang-format on
+}
+
+function maybeRenderReasonContext(explanation: Protocol.Page.BackForwardCacheNotRestoredExplanation): LitTemplate {
+  if (explanation.reason ===
+          Protocol.Page.BackForwardCacheNotRestoredReason.EmbedderExtensionSentMessageToCachedFrame &&
+      explanation.context) {
+    const link = 'chrome://extensions/?id=' + explanation.context as Platform.DevToolsPath.UrlString;
+    // clang-format off
+    return html`${i18nString(UIStrings.blockingExtensionId)}
+      <devtools-link .href=${link} allow-privileged>${explanation.context}</devtools-link>`;
+    // clang-format on
+  }
+  return nothing;
+}
+
+function renderFramesPerReason(frames: string[]|undefined): LitTemplate {
+  if (frames === undefined || frames.length === 0) {
+    return nothing;
+  }
+  const rows = [html`<div>${i18nString(UIStrings.framesPerIssue, {n: frames.length})}</div>`];
+  rows.push(...frames.map(url => html`<div class="text-ellipsis" title=${url}
+    jslog=${VisualLogging.treeItem().track({resize: true})}>${url}</div>`));
+  return html`
+      <div class="details-list"
+      jslog=${VisualLogging.tree('frames-per-issue')}>
+        <devtools-expandable-list .data=${{
+    rows,
+    title: i18nString(UIStrings.framesPerIssue, {n: frames.length}),
+  } as ExpandableList.ExpandableList.ExpandableListData}
+        jslog=${VisualLogging.treeItem().track({
+    resize: true,
+  })}></devtools-expandable-list>
+      </div>
+    `;
+}
+
+function maybeRenderDeepLinkToUnload(explanation: Protocol.Page.BackForwardCacheNotRestoredExplanation): LitTemplate {
+  if (explanation.reason === Protocol.Page.BackForwardCacheNotRestoredReason.UnloadHandlerExistsInMainFrame ||
+      explanation.reason === Protocol.Page.BackForwardCacheNotRestoredReason.UnloadHandlerExistsInSubFrame) {
+    return html`
+        <devtools-link href="https://web.dev/bfcache/#never-use-the-unload-event" class="link"
+        jslogContext=${'learn-more.never-use-unload'}>
+          ${i18nString(UIStrings.neverUseUnload)}
+        </devtools-link>`;
+  }
+  return nothing;
+}
+
+function maybeRenderJavaScriptDetails(details: Protocol.Page.BackForwardCacheBlockingDetails[]|undefined): LitTemplate {
+  if (details === undefined || details.length === 0) {
+    return nothing;
+  }
+  const maxLengthForDisplayedURLs = 50;
+  const rows = [html`<div>${i18nString(UIStrings.filesPerIssue, {n: details.length})}</div>`];
+  rows.push(...details.map(detail => html`
+          ${widget(Components.Linkifier.ScriptLocationLink, {
+                             sourceURL: detail.url as Platform.DevToolsPath.UrlString,
+                             lineNumber: detail.lineNumber,
+                             options: {
+                               columnNumber: detail.columnNumber,
+                               showColumnNumber: true,
+                               maxLength: maxLengthForDisplayedURLs,
+                             },
+                           })}`));
+  return html`
+      <div class="details-list">
+        <devtools-expandable-list .data=${
+      {rows} as ExpandableList.ExpandableList.ExpandableListData}></devtools-expandable-list>
+      </div>
+    `;
+}
+
+function renderReason(
+    explanation: Protocol.Page.BackForwardCacheNotRestoredExplanation, frames: string[]|undefined): TemplateResult {
+  // clang-format off
+  return html`
+    <devtools-report-section>
+      ${(explanation.reason in NotRestoredReasonDescription) ?
+        html`
+          <div class="circled-exclamation-icon">
+            <devtools-icon class="inline-icon medium" style="color: var(--icon-warning)" name="warning">
+            </devtools-icon>
+          </div>
+          <div>
+            ${NotRestoredReasonDescription[explanation.reason].name()}
+            ${maybeRenderDeepLinkToUnload(explanation)}
+            ${maybeRenderReasonContext(explanation)}
+          </div>` :
+          nothing}
+    </devtools-report-section>
+    <div class="gray-text">
+      ${explanation.reason}
+    </div>
+    ${maybeRenderJavaScriptDetails(explanation.details)}
+    ${renderFramesPerReason(frames)}`;
+  // clang-format on
+}
+
+interface ViewInput {
+  frame: SDK.ResourceTreeModel.ResourceTreeFrame|null;
+  frameTreeData: {node: FrameTreeNodeData, frameCount: number, issueCount: number}|undefined;
+  reasonToFramesMap: Map<Protocol.Page.BackForwardCacheNotRestoredReason, string[]>;
+  screenStatus: ScreenStatusType;
+  navigateAwayAndBack: () => Promise<void>;
+}
+
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
+
+const DEFAULT_VIEW: View = (input, output, target) => {
+  // Disabled until https://crbug.com/1079231 is fixed.
+  // clang-format off
+  render(html`
+    <style>${backForwardCacheViewStyles}</style>
+    <devtools-report .data=${
+        {reportTitle: i18nString(UIStrings.backForwardCacheTitle)} as ReportView.ReportView.ReportData
+    } jslog=${VisualLogging.pane('back-forward-cache')}>
+
+      ${renderMainFrameInformation(input.frame, input.frameTreeData, input.reasonToFramesMap, input.screenStatus, input.navigateAwayAndBack)}
+    </devtools-report>
+  `, target);
+  // clang-format on
+};
+
+export class BackForwardCacheView extends UI.Widget.Widget {
+  #screenStatus = ScreenStatusType.RESULT;
+  #historyIndex = 0;
+  #view: View;
+
+  constructor(view: View = DEFAULT_VIEW) {
+    super({useShadowDom: true, delegatesFocus: true});
+    this.#view = view;
+  }
+
+  override wasShown(): void {
+    super.wasShown();
+    SDK.TargetManager.TargetManager.instance().addModelListener(SDK.ResourceTreeModel.ResourceTreeModel,
+                                                                SDK.ResourceTreeModel.Events.PrimaryPageChanged,
+                                                                this.requestUpdate, this);
+    SDK.TargetManager.TargetManager.instance().addModelListener(
+        SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.BackForwardCacheDetailsUpdated,
+        this.requestUpdate, this);
+    this.requestUpdate();
+  }
+
+  override willHide(): void {
+    SDK.TargetManager.TargetManager.instance().removeModelListener(SDK.ResourceTreeModel.ResourceTreeModel,
+                                                                   SDK.ResourceTreeModel.Events.PrimaryPageChanged,
+                                                                   this.requestUpdate, this);
+    SDK.TargetManager.TargetManager.instance().removeModelListener(
+        SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.BackForwardCacheDetailsUpdated,
+        this.requestUpdate, this);
+    super.willHide();
+  }
+
+  #getMainResourceTreeModel(): SDK.ResourceTreeModel.ResourceTreeModel|null {
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    return mainTarget?.model(SDK.ResourceTreeModel.ResourceTreeModel) || null;
+  }
+
+  #getMainFrame(): SDK.ResourceTreeModel.ResourceTreeFrame|null {
+    return this.#getMainResourceTreeModel()?.mainFrame || null;
+  }
+
+  override async performUpdate(): Promise<void> {
+    const reasonToFramesMap = new Map<Protocol.Page.BackForwardCacheNotRestoredReason, string[]>();
+    const frame = this.#getMainFrame();
+    const explanationTree = frame?.backForwardCacheDetails?.explanationsTree;
+    if (explanationTree) {
+      this.#buildReasonToFramesMap(explanationTree, {blankCount: 1}, reasonToFramesMap);
+    }
+    const frameTreeData = this.#buildFrameTreeDataRecursive(explanationTree, {blankCount: 1});
+    // Override the icon for the outermost frame.
+    frameTreeData.node.iconName = 'frame';
+    const viewInput: ViewInput = {
+      frame,
+      frameTreeData,
+      reasonToFramesMap,
+      screenStatus: this.#screenStatus,
+      navigateAwayAndBack: this.#navigateAwayAndBack.bind(this),
+    };
+    this.#view(viewInput, undefined, this.contentElement);
+  }
+
+  #renderBackForwardCacheTestResult(): void {
+    SDK.TargetManager.TargetManager.instance().removeModelListener(
+        SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.FrameNavigated,
+        this.#renderBackForwardCacheTestResult, this);
+    this.#screenStatus = ScreenStatusType.RESULT;
+    this.requestUpdate();
+    void this.updateComplete.then(() => {
+      UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.testCompleted));
+      this.contentElement.focus();
+    });
+  }
+
+  async #onNavigatedAway(): Promise<void> {
+    SDK.TargetManager.TargetManager.instance().removeModelListener(
+        SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.FrameNavigated, this.#onNavigatedAway,
+        this);
+    await this.#waitAndGoBackInHistory(50);
+  }
+
+  async #waitAndGoBackInHistory(delay: number): Promise<void> {
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    const resourceTreeModel = mainTarget?.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    const historyResults = await resourceTreeModel?.navigationHistory();
+    if (!resourceTreeModel || !historyResults) {
+      return;
+    }
+    // The navigation history can be delayed. If this is the case we wait and
+    // check again later. Otherwise it would be possible to press the 'Test
+    // BFCache' button again too soon, leading to the browser stepping back in
+    // history without returning to the correct page.
+    if (historyResults.currentIndex === this.#historyIndex) {
+      window.setTimeout(this.#waitAndGoBackInHistory.bind(this, delay * 2), delay);
+    } else {
+      SDK.TargetManager.TargetManager.instance().addModelListener(
+          SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.FrameNavigated,
+          this.#renderBackForwardCacheTestResult, this);
+      resourceTreeModel.navigateToHistoryEntry(historyResults.entries[historyResults.currentIndex - 1]);
+    }
+  }
+
+  async #navigateAwayAndBack(): Promise<void> {
+    // Checking BFCache Compatibility
+
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    const resourceTreeModel = mainTarget?.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    const historyResults = await resourceTreeModel?.navigationHistory();
+    if (!resourceTreeModel || !historyResults) {
+      return;
+    }
+    this.#historyIndex = historyResults.currentIndex;
+    this.#screenStatus = ScreenStatusType.RUNNING;
+    this.requestUpdate();
+
+    // This event listener is removed inside of onNavigatedAway().
+    SDK.TargetManager.TargetManager.instance().addModelListener(
+        SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.FrameNavigated, this.#onNavigatedAway,
+        this);
+
+    // We can know whether the current page can use BFCache
+    // as the browser navigates to another unrelated page and goes back to the current page.
+    // We chose "chrome://terms" because it must be cross-site.
+    // Ideally, We want to have our own testing page like "chrome: //bfcache-test".
+    void resourceTreeModel.navigate('chrome://terms' as Platform.DevToolsPath.UrlString);
+  }
+
+  // Builds a subtree of the frame tree, conaining only frames with BFCache issues and their ancestors.
+  // Returns the root node, the number of frames in the subtree, and the number of issues in the subtree.
+  #buildFrameTreeDataRecursive(
+      explanationTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree|undefined,
+      nextBlankURLCount: {blankCount: number}): {node: FrameTreeNodeData, frameCount: number, issueCount: number} {
+    if (!explanationTree) {
+      return {node: {text: ''}, frameCount: 0, issueCount: 0};
+    }
+    let frameCount = 1;
+    let issueCount = 0;
+    const children: FrameTreeNodeData[] = [];
+
+    let nodeUrlText = '';
+    if (explanationTree.url.length) {
+      nodeUrlText = explanationTree.url;
+    } else {
+      nodeUrlText = i18nString(UIStrings.blankURLTitle, {PH1: nextBlankURLCount.blankCount});
+      nextBlankURLCount.blankCount += 1;
+    }
+
+    for (const explanation of explanationTree.explanations) {
+      const child = {text: explanation.reason};
+      issueCount += 1;
+      children.push(child);
+    }
+    for (const child of explanationTree.children) {
+      const frameTreeData = this.#buildFrameTreeDataRecursive(child, nextBlankURLCount);
+      if (frameTreeData.issueCount > 0) {
+        children.push(frameTreeData.node);
+        issueCount += frameTreeData.issueCount;
+        frameCount += frameTreeData.frameCount;
+      }
+    }
+
+    let node: FrameTreeNodeData = {
+      text: `(${issueCount}) ${nodeUrlText}`,
+    };
+    if (children.length) {
+      node = {...node, children};
+      node.iconName = 'iframe';
+    } else if (!explanationTree.url.length) {
+      // If the current node increased the blank count, but it has no children and
+      // is therefore not shown, decrement the blank count again.
+      nextBlankURLCount.blankCount -= 1;
+    }
+    return {node, frameCount, issueCount};
+  }
+
+  #buildReasonToFramesMap(
+      explanationTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree,
+      nextBlankURLCount: {blankCount: number},
+      outputMap: Map<Protocol.Page.BackForwardCacheNotRestoredReason, string[]>): void {
+    let url = explanationTree.url;
+    if (url.length === 0) {
+      url = i18nString(UIStrings.blankURLTitle, {PH1: nextBlankURLCount.blankCount});
+      nextBlankURLCount.blankCount += 1;
+    }
+    explanationTree.explanations.forEach(explanation => {
+      let frames: string[]|undefined = outputMap.get(explanation.reason);
+      if (frames === undefined) {
+        frames = [url];
+        outputMap.set(explanation.reason, frames);
+      } else {
+        frames.push(url);
+      }
+    });
+    explanationTree.children.map(child => {
+      this.#buildReasonToFramesMap(child, nextBlankURLCount, outputMap);
+    });
+  }
+}
+
+interface FrameTreeNodeData {
+  text: string;
+  iconName?: string;
+  children?: FrameTreeNodeData[];
+}

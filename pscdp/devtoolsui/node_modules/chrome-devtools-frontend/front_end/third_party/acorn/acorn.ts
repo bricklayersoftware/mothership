@@ -1,0 +1,14 @@
+// Copyright (c) 2020 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import * as acorn from './package/dist/acorn.mjs';
+
+import type * as ESTree from './estree-legacy.js';
+export {ESTree};
+
+export { type Comment, defaultOptions, getLineInfo, Node, SourceLocation, Token, tokTypes} from './package/dist/acorn.mjs';
+
+export const Parser: typeof acorn.Parser = acorn.Parser;
+export const tokenizer: typeof acorn.Parser.tokenizer = acorn.Parser.tokenizer.bind(acorn.Parser);
+export const parse: typeof acorn.Parser.parse = acorn.Parser.parse.bind(acorn.Parser);

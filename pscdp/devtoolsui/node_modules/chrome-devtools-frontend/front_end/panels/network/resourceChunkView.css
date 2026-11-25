@@ -1,0 +1,54 @@
+/*
+ * Copyright 2014 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+@scope to (devtools-widget > *) {
+  :scope {
+    overflow: auto;
+    height: 100%;
+  }
+
+  .resource-chunk-view {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: text;
+  }
+
+  devtools-split-view {
+    flex: auto;
+    height: 100%;
+  }
+
+  .data-grid .data-container table.data {
+    tr.data-grid-data-grid-node {
+      td.resource-chunk-view-td {
+        border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
+      }
+
+      &.resource-chunk-view-row-send td:first-child::before {
+        content: "\2B06";
+        color: var(--sys-color-tertiary);
+        padding-right: var(--sys-size-3);
+      }
+
+      &.resource-chunk-view-row-receive td:first-child::before {
+        content: "\2B07";
+        color: var(--sys-color-error);
+        padding-right: var(--sys-size-3);
+      }
+
+      &.resource-chunk-view-row-send {
+        background-color: color-mix(in srgb, var(--sys-color-tertiary-container), transparent 50%);
+      }
+
+      &.resource-chunk-view-row-error {
+        background-color: var(--sys-color-surface-error);
+        color: var(--sys-color-on-surface-error);
+      }
+    }
+  }
+}

@@ -1,0 +1,204 @@
+// Copyright 2012 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
+import * as SDK from '../../core/sdk/sdk.js';
+import type * as Protocol from '../../generated/protocol.js';
+import type * as Workspace from '../workspace/workspace.js';
+
+const uiSourceCodeToAttributionMap = new WeakMap<Workspace.UISourceCode.UISourceCode, Map<Protocol.Page.FrameId, {
+                                                   frame: SDK.ResourceTreeModel.ResourceTreeFrame,
+                                                   count: number,
+                                                 }>>();
+
+export class NetworkProjectManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
+  readonly #projectToTargetMap = new WeakMap<Workspace.Workspace.Project, SDK.Target.Target>();
+  readonly #sourceURLSynthesizedUISourceCodes = new WeakSet<Workspace.UISourceCode.UISourceCode>();
+
+  static instance({forceNew}: {
+    forceNew: boolean,
+  } = {forceNew: false}): NetworkProjectManager {
+    if (!Root.DevToolsContext.globalInstance().has(NetworkProjectManager) || forceNew) {
+      Root.DevToolsContext.globalInstance().set(NetworkProjectManager, new NetworkProjectManager());
+    }
+
+    return Root.DevToolsContext.globalInstance().get(NetworkProjectManager);
+  }
+
+  static removeInstance(): void {
+    Root.DevToolsContext.globalInstance().delete(NetworkProjectManager);
+  }
+
+  setTargetForProject(project: Workspace.Workspace.Project, target: SDK.Target.Target): void {
+    this.#projectToTargetMap.set(project, target);
+  }
+
+  getTargetForProject(project: Workspace.Workspace.Project): SDK.Target.Target|null {
+    return this.#projectToTargetMap.get(project) ?? null;
+  }
+
+  getTargetForUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): SDK.Target.Target|null {
+    return this.#projectToTargetMap.get(uiSourceCode.project()) ?? null;
+  }
+
+  setSourceURLSynthesized(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
+    this.#sourceURLSynthesizedUISourceCodes.add(uiSourceCode);
+  }
+
+  isSourceURLSynthesized(uiSourceCode: Workspace.UISourceCode.UISourceCode): boolean {
+    return this.#sourceURLSynthesizedUISourceCodes.has(uiSourceCode);
+  }
+}
+
+export const enum Events {
+  FRAME_ATTRIBUTION_ADDED = 'FrameAttributionAdded',
+  FRAME_ATTRIBUTION_REMOVED = 'FrameAttributionRemoved',
+}
+
+export interface FrameAttributionEvent {
+  uiSourceCode: Workspace.UISourceCode.UISourceCode;
+  frame: SDK.ResourceTreeModel.ResourceTreeFrame;
+}
+
+export interface EventTypes {
+  [Events.FRAME_ATTRIBUTION_ADDED]: FrameAttributionEvent;
+  [Events.FRAME_ATTRIBUTION_REMOVED]: FrameAttributionEvent;
+}
+
+export class NetworkProject {
+  /**
+   * Records that `uiSourceCode` was synthesized from a `//# sourceURL=` annotation,
+   * and therefore doesn't correspond to an actual network resource.
+   */
+  static setSourceURLSynthesized(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    NetworkProjectManager.instance().setSourceURLSynthesized(uiSourceCode);
+  }
+
+  /**
+   * Whether `uiSourceCode` was synthesized from a `//# sourceURL=` annotation.
+   *
+   * Both the URL and the content of such a source are fully controlled by the page,
+   * so it must never be treated like a genuine network resource (for example it must
+   * not be persisted as a local override, see b/553931271).
+   */
+  static isSourceURLSynthesized(uiSourceCode: Workspace.UISourceCode.UISourceCode): boolean {
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    return NetworkProjectManager.instance().isSourceURLSynthesized(uiSourceCode);
+  }
+
+  static resolveFrame(uiSourceCode: Workspace.UISourceCode.UISourceCode, frameId: Protocol.Page.FrameId):
+      SDK.ResourceTreeModel.ResourceTreeFrame|null {
+    const target = NetworkProject.targetForUISourceCode(uiSourceCode);
+    const resourceTreeModel = target?.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    return resourceTreeModel ? resourceTreeModel.frameForId(frameId) : null;
+  }
+
+  static setInitialFrameAttribution(uiSourceCode: Workspace.UISourceCode.UISourceCode, frameId: Protocol.Page.FrameId):
+      void {
+    if (!frameId) {
+      return;
+    }
+    const frame = NetworkProject.resolveFrame(uiSourceCode, frameId);
+    if (!frame) {
+      return;
+    }
+    const attribution = new Map<Protocol.Page.FrameId, {
+      frame: SDK.ResourceTreeModel.ResourceTreeFrame,
+      count: number,
+    }>();
+    attribution.set(frameId, {frame, count: 1});
+    uiSourceCodeToAttributionMap.set(uiSourceCode, attribution);
+  }
+
+  static cloneInitialFrameAttribution(
+      fromUISourceCode: Workspace.UISourceCode.UISourceCode,
+      toUISourceCode: Workspace.UISourceCode.UISourceCode): void {
+    const fromAttribution = uiSourceCodeToAttributionMap.get(fromUISourceCode);
+    if (!fromAttribution) {
+      return;
+    }
+    const toAttribution = new Map<Protocol.Page.FrameId, {
+      frame: SDK.ResourceTreeModel.ResourceTreeFrame,
+      count: number,
+    }>();
+    for (const frameId of fromAttribution.keys()) {
+      const value = fromAttribution.get(frameId);
+      if (typeof value !== 'undefined') {
+        toAttribution.set(frameId, {frame: value.frame, count: value.count});
+      }
+    }
+    uiSourceCodeToAttributionMap.set(toUISourceCode, toAttribution);
+  }
+
+  static addFrameAttribution(uiSourceCode: Workspace.UISourceCode.UISourceCode, frameId: Protocol.Page.FrameId): void {
+    const frame = NetworkProject.resolveFrame(uiSourceCode, frameId);
+    if (!frame) {
+      return;
+    }
+    const frameAttribution = uiSourceCodeToAttributionMap.get(uiSourceCode);
+    if (!frameAttribution) {
+      return;
+    }
+    const attributionInfo = frameAttribution.get(frameId) || {frame, count: 0};
+    attributionInfo.count += 1;
+    frameAttribution.set(frameId, attributionInfo);
+    if (attributionInfo.count !== 1) {
+      return;
+    }
+
+    const data = {uiSourceCode, frame};
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    NetworkProjectManager.instance().dispatchEventToListeners(Events.FRAME_ATTRIBUTION_ADDED, data);
+  }
+
+  static removeFrameAttribution(uiSourceCode: Workspace.UISourceCode.UISourceCode, frameId: Protocol.Page.FrameId):
+      void {
+    const frameAttribution = uiSourceCodeToAttributionMap.get(uiSourceCode);
+    if (!frameAttribution) {
+      return;
+    }
+    const attributionInfo = frameAttribution.get(frameId);
+    console.assert(Boolean(attributionInfo), 'Failed to remove frame attribution for url: ' + uiSourceCode.url());
+    if (!attributionInfo) {
+      return;
+    }
+    attributionInfo.count -= 1;
+    if (attributionInfo.count > 0) {
+      return;
+    }
+    frameAttribution.delete(frameId);
+    const data = {uiSourceCode, frame: attributionInfo.frame};
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    NetworkProjectManager.instance().dispatchEventToListeners(Events.FRAME_ATTRIBUTION_REMOVED, data);
+  }
+
+  static targetForUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): SDK.Target.Target|null {
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    return NetworkProjectManager.instance().getTargetForUISourceCode(uiSourceCode);
+  }
+
+  static setTargetForProject(project: Workspace.Workspace.Project, target: SDK.Target.Target): void {
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    NetworkProjectManager.instance().setTargetForProject(project, target);
+  }
+
+  static getTargetForProject(project: Workspace.Workspace.Project): SDK.Target.Target|null {
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    return NetworkProjectManager.instance().getTargetForProject(project);
+  }
+
+  static framesForUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode):
+      SDK.ResourceTreeModel.ResourceTreeFrame[] {
+    const target = NetworkProject.targetForUISourceCode(uiSourceCode);
+    const resourceTreeModel = target?.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    const attribution = uiSourceCodeToAttributionMap.get(uiSourceCode);
+    if (!resourceTreeModel || !attribution) {
+      return [];
+    }
+    const frames = Array.from(attribution.keys()).map(frameId => resourceTreeModel.frameForId(frameId));
+    return frames.filter(frame => !!frame);
+  }
+}
