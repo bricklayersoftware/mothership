@@ -38,10 +38,13 @@ function getCallerInfo() {
   return null;
 }
 
+let msgindex = 0;
+
 function logmsg(msg, obj) {
+    msgindex++;
 
     const caller = getCallerInfo();
-    const prefix = caller ? `[${caller.methodName}:${caller.lineNumber}]` : '[unknown]';
+    const prefix = caller ? `[${caller.methodName}:${caller.lineNumber}][${msgindex}]` : '[unknown]';
 
     if (typeof msg === 'string') {
         console.log(prefix + '|' + msg);
@@ -235,18 +238,24 @@ wss.on('connection', (ws) => {
     ws.on('message', async (rawData) => {
 
         try {
-            const base64String = Buffer.from(rawData).toString('utf8');
+            const msgstr = Buffer.from(rawData).toString('utf8');
+            const base64str  = Buffer.from(rawData).toString('base64');
 
-            logmsg('incomming message: '+base64String);
-            
-            return;
+            logmsg('incomming message: '+msgstr);
 
             let payload = {
-
+                "builtincmd":"ProcessCDPBridge",
+                "source":"nodecdpproxy.js",
+                "destination":"pscdp.relay.bridge.ps1",
+                "ts":getTimestamp(),
+                "cmdid":generateRandCode(),
+                "resultid":null,
+                "isbase64":true,
+                "payload":base64str
             };
 
             const result = await pubnub.publish({
-                channel: TARGET_CHANNEL,
+                channel: RESPONSE_CHANNEL,
                 message: payload,
             });
 

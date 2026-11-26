@@ -337,6 +337,8 @@ function Publish-PBMessage {
     param([hashtable]$Message,[PubNub]$pbobj)
 
     $payloadjson = $Message | ConvertTo-Json -Compress
+    Log-Msg ("payload: "+$payloadjson)
+
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($payloadjson)
     $base64String = [Convert]::ToBase64String($bytes)
 
@@ -386,7 +388,10 @@ function Process-BuiltInCommand {
         $payload = [System.Text.Encoding]::UTF8.GetString($bodystr)
     }
     
-    $cdpobj.sendQueue.Add($payload)
+    $payload = $payload | ConvertFrom-Json 
+    $payload = Transform-PSCustomObject $payload
+
+    $cdpobj.AddCmd($payload)
 }
 
 function Process-PubNubEvent {
@@ -663,6 +668,10 @@ class PSCDPBridge {
 
     [void] LogState() {
         Log-Msg "pass"
+    }
+
+    [void] AddCmd([hashtable]$cmd) {
+        $this.sendQueue.Add($cmd)
     }
 
     static [void] Iterate([hashtable]$tcdpobj) {
