@@ -8,7 +8,7 @@ socket.addEventListener('open', () => {
   console.log('Connected to server');
 
   // Send a plain text message
-  socket.send('nodecdpproxy.testclient.js ');
+  socket.send('hello from nodecdpproxy.testclient.js');
 
   // Send a JSON payload
   socket.send(JSON.stringify({ event: 'ping', timestamp: Date.now() }));

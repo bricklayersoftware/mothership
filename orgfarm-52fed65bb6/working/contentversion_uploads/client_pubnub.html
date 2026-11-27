@@ -556,13 +556,21 @@
 
             let message = messageEvent.message || {};
 
-            if ( message.destination != 'BROADCAST' && message.source != 'client_pubnub.html' && ( ! helper.isNullOrEmpty(message['builtincmd']) ) ) {
+            let iscmdresult = message.destination != 'BROADCAST';
+            iscmdresult = iscmdresult && message.source != 'client_pubnub.html';
+            iscmdresult = iscmdresult && message.destination == 'client_pubnub.html';
+            iscmdresult = iscmdresult && ( ! helper.isNullOrEmpty(message['builtincmd']) );
+            
+            // update result field of previously issued bultincmd
+            if ( iscmdresult ) {
                 let cmd = window.builtincmds.find( cmd => {
                     return cmd.cmdid == message['cmdid']
                 });
 
-                cmd['resultid'] = message.resultid;
-                cmd['ts'] = message.ts;
+                if ( cmd ) {
+                    cmd['resultid'] = message.resultid;
+                    cmd['ts'] = message.ts;
+                }
             }
 
             let opts = jsui.getOpts();

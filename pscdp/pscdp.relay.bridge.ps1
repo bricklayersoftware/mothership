@@ -376,22 +376,40 @@ function Ping-DebugPort {
 function Process-BuiltInCommand {
     param([hashtable]$cmd, [PSCDPBridge]$cdpobj)
 
-    if ( $cmd.builtincmd -ne "ProcessCDPBridge" ) {
+    $supportedCmds = @( 'ProcessCDPBridge', 'ConnectPageSocket', 'GetPageSockets' )
+
+    if ( ! ( $supportedCmds -contains $cmd.builtincmd ) ) {
         return
     }
 
-    $isbase64 = $cmd['isbase64']
-    $payload = $cmd['payload']
+    if ( $cmd.builtincmd -eq 'ProcessCDPBridge' ) {
+        $isbase64 = $cmd['isbase64']
+        $payload = $cmd['payload']
 
-    if ( $isbase64 ) {
-        $bodystr = [System.Convert]::FromBase64String($payload)
-        $payload = [System.Text.Encoding]::UTF8.GetString($bodystr)
+        if ( $isbase64 ) {
+            $bodystr = [System.Convert]::FromBase64String($payload)
+            $payload = [System.Text.Encoding]::UTF8.GetString($bodystr)
+        }
+        
+        $payload = $payload | ConvertFrom-Json 
+        $payload = Transform-PSCustomObject $payload
+
+        $cdpobj.AddCmd($payload)
+    } elseif ( $cmd.builtincmd -eq 'ConnectPageSocket' ) {
+        $targetId = $cmd['targetid']
+        $target = @{
+            targetId=$targetId
+        }
+        # anchor
+        Connect-PageSocket $target
     }
-    
-    $payload = $payload | ConvertFrom-Json 
-    $payload = Transform-PSCustomObject $payload
 
-    $cdpobj.AddCmd($payload)
+}
+
+function Connect-PageSocket {
+    param([hashtable]$target)
+
+
 }
 
 function Process-PubNubEvent {
@@ -498,10 +516,10 @@ class PSCDPBridge {
         return $this.wsUri
     }
 
-    [void] ConnectCdp() {
-        Log-Msg "[$($this.wsname)] attempting new CDP connection at $($this.debugport)"
+    [void] ConnectCdp($wsuri) {
+        Log-Msg "[$($this.wsname)] attempting new CDP connection at $($this.debugport) using [$wsuri]"
 
-        $this.wsUri = $this.GetWSUrI()
+        $this.wsUri = $wsuri
 
         if ( $null -eq $this.websocket ) {
             Log-Msg "connecting to cdp on [$($this.wsUri)]"
@@ -543,11 +561,24 @@ class PSCDPBridge {
                 # callback=$script:getTargets_callback
             }
         )
-        
+    }
+
+    [void] ConnectCdp() {
+        $this.wsUri = $this.GetWSUrI()
+
+        $this.ConnectCdp($this.wsUri)        
     }
 
     [void] SendCdpCommand($cmd) {
 
+        if ( ![string]::IsNullOrEmpty($cmd['method'])  ) {
+            Log-Msg "$($cmd['method'])"
+        }
+
+        if ( $cmd['method'] -eq "Network.setCacheDisabled" ) {
+            Log-Msg "pass"
+        }
+        
         $payload = $cmd | ConvertTo-Json -Compress -Depth 10
         $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
         $buffer = New-Object System.ArraySegment[byte] -ArgumentList @(,$bytes)
@@ -721,7 +752,6 @@ class PSCDPBridge {
             $cdpobj.NextCmd()
         }
     }
-
 }
 
 class PubNub {

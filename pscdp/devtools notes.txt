@@ -4,14 +4,22 @@
     and remote debugging URLs.
 
     Main DevTools UI: 
+    devtools://devtools/bundled/devtools_app.html?ws=localhost:8123/devtools/browser/<guid>
     devtools://devtools/bundled/devtools_app.html?ws=localhost:8123/devtools/browser/36a42bbf-cb3d-492b-873a-91e69ea4306b
+
+    devtools://devtools/bundled/devtools_app.html?ws=127.0.0.1:8123/devtools/browser/f248832e-8760-48ff-b59d-65ff72526678
+
+    Write-Host (( iwr -Uri http://localhost:9223/json/version -UseBasicParsing ).Content | ConvertFrom-Json).webSocketDebuggerUrl
+
 
     Standalone Inspector Entrypoint: 
     devtools://devtools/bundled/inspector.html
 
     devtools://devtools/bundled/inspector.html?ws=localhost:9222/devtools/page/<PAGE_ID>
-
+    
     http://localhost:<DEVTOOLS_FRONTEND_PORT>/devtools/inspector.html?ws=localhost:8080
+
+    
 
     Page-level (/devtools/page/<id>)
         Attaches directly to a single tab's renderer. You immediately see the DOM, 
